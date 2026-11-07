@@ -93,12 +93,14 @@ def add_text_run(paragraph, text, **props):
 # paragraphs
 # --------------------------------------------------------------------------- #
 def para_props(paragraph, *, rtl=True, align="both", space_before=0,
-               space_after=0, line=None, keep_next=False, contextual=False):
+               space_after=0, line=None, keep_next=False, keep_lines=True,
+               contextual=False, ind_first=0, bidi=True):
     """
-    Build pPr in schema order:
-    keepNext, spacing, bidi, jc, rPr
-    `align`: 'both' -> w:jc both, 'center', 'right', 'left'
-    For RTL paragraphs `w:jc` values right/left are physical, both/center are neutral.
+    Build pPr in CT_PPr schema order:
+        keepNext, keepLines, bidi, spacing, ind, contextualSpacing, jc
+    Order matters: Word rejects (or silently drops) out-of-sequence children.
+    `align`: 'both' | 'center' | 'right' | 'left'.  For RTL paragraphs
+    right/left are physical; both/center are neutral.
     """
     p = paragraph._p
     pPr = p.find(qn("w:pPr"))
@@ -108,6 +110,10 @@ def para_props(paragraph, *, rtl=True, align="both", space_before=0,
 
     if keep_next:
         pPr.append(el("w:keepNext", val="1"))
+    if keep_lines:
+        pPr.append(el("w:keepLines", val="1"))
+    if rtl and bidi:
+        pPr.append(el("w:bidi", val="1"))
 
     spacing = el("w:spacing")
     spacing.set(qn("w:before"), str(space_before))
@@ -117,13 +123,14 @@ def para_props(paragraph, *, rtl=True, align="both", space_before=0,
         spacing.set(qn("w:lineRule"), "auto")
     pPr.append(spacing)
 
-    if rtl:
-        pPr.append(el("w:bidi", val="1"))
-        if contextual:
-            pPr.append(el("w:contextualSpacing", val="1"))
+    if ind_first:
+        ind = el("w:ind")
+        ind.set(qn("w:firstLine"), str(ind_first))
+        pPr.append(ind)
+    if contextual:
+        pPr.append(el("w:contextualSpacing", val="1"))
 
-    jc = el("w:jc", val=align)
-    pPr.append(jc)
+    pPr.append(el("w:jc", val=align))
     return pPr
 
 

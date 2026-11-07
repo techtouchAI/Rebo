@@ -29,6 +29,7 @@ from docx.oxml import OxmlElement
 
 from . import design_tokens as T
 from . import ooxml as X
+from . import structure as S
 
 ASSET_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                          "templates", "assets")
@@ -216,7 +217,7 @@ def build_meta_cards(doc, model):
 
 
 # --------------------------------------------------------------------------- #
-def split_for_layout(text, limit=None):
+def split_for_layout(text, limit=None):  # kept for callers/tests
     """
     Partition a long cell value into consecutive chunks that each fit a row.
 
@@ -250,12 +251,12 @@ def split_for_layout(text, limit=None):
 def build_plan_table(doc, model, page_num):
     rows = []
     for r in model["content_rows"]:
-        chunks = split_for_layout(r["value"])
-        for k, chunk in enumerate(chunks):
+        segs = S.segments(r["value"])
+        for k, packed in enumerate(S.pack_rows(segs, T.CHARS_PER_BODY_ROW)):
             rows.append({
                 "label": r["label"] if k == 0 else "",
-                "value": chunk,
-                "render": r.get("render", "heading") if k == 0 else "heading",
+                "paras": packed,
+                "render": r.get("render", "heading"),
                 "continued": k > 0,
             })
     nav = [r for r in model["nav_rows"] if r["type"] == "nav"]
@@ -286,12 +287,12 @@ def build_plan_table(doc, model, page_num):
     for item in nav:
         row = tbl.rows[ri]
         X.row_props(row, height=T.ROW_MIN_H_TWIPS, cant_split=True)
-        _fill_row(row, n, ri, label=item["label"], value=item["value"], kind="nav")
+        _fill_row(row, n, ri, label=item["label"], paras=[item["value"]], kind="nav")
         ri += 1
     for item in rows:
         row = tbl.rows[ri]
         X.row_props(row, height=T.ROW_MIN_H_TWIPS, cant_split=False)
-        _fill_row(row, n, ri, label=item["label"], value=item["value"],
+        _fill_row(row, n, ri, label=item["label"], paras=item["paras"],
                   kind=item.get("render", "heading"))
         ri += 1
 
@@ -344,7 +345,18 @@ def _merge_column(tbl, ci, text):
                      space_before=0, space_after=0, line=240)
 
 
-def _fill_row(row, total, ri, *, label, value, kind):
+def _fill_row(row, total, ri, *, label, paras, kind):
+    """
+    Fill one table row.
+
+    The label is printed exactly ONCE.  Which column holds it depends on the
+    source's own structure:
+      * nav rows    -> short label in الموضوع, prose in the content column
+      * fragment    -> the source cut one sentence across the two cells, so it
+                       is rejoined in the content column and الموضوع stays empty
+      * heading     -> the label is the row's title, so it heads the content
+                       column and الموضوع stays empty (as in the design mock)
+    """
     cells = row.cells
     # logical 0 = rightmost card, 1 = second card, 2 = الموضوع, 3 = content
     content, lab = cells[3], cells[2]
@@ -356,23 +368,27 @@ def _fill_row(row, total, ri, *, label, value, kind):
     X.cell_shade(lab, T.C_LABEL_FILL)
 
     if kind == "nav":
-        blocks = [(value or label, "p")]
+        blocks = [("\n".join(paras) or label, "p")]
         lab_blocks = [(label, "h")]
     elif kind == "fragment":
         # The source split a sentence across the two cells.  Rejoin it in the
         # content column and leave the label column empty -- echoing the label in
         # both places would duplicate the opening words (it would also break the
         # character audit, which is what caught it).
-        blocks = [((label + " " + value).strip(), "p")]
+        blocks = [((label + " " + "\n".join(paras)).strip(), "p")]
         lab_blocks = []
     else:
+        # ONE source of truth per cell: the heading.  A label longer than the
+        # column can hold is a sentence fragment in the source, so it is set as
+        # prose instead of as a heading.
         blocks = []
         if label:
-            blocks.append((label, "h"))
-        if value:
-            blocks.append((value, "p"))
-        # short labels also identify the row in the الموضوع column
-        lab_blocks = [((label if len(label) <= 34 else ""), "h")]
+            head = len(label) <= T.LABEL_COL_MAX_CHARS
+            blocks.append((label, "h" if head else "p"))
+        if paras:
+            blocks.append(("\n".join(paras), "p"))
+        lab_blocks = []
+
     _write(blocks, content)
     _write(lab_blocks, lab, align="center")
 
@@ -384,6 +400,11 @@ def _fill_row(row, total, ri, *, label, value, kind):
 
 
 def _write(blocks, cell, align="both"):
+    """
+    Emit blocks into a cell.  A block whose text contains newlines becomes one
+    PARAGRAPH PER LINE: that is display rhythm only, the characters are the
+    source's own and stay in their original order.
+    """
     first = True
     for item in blocks:
         if not item:
@@ -391,17 +412,28 @@ def _write(blocks, cell, align="both"):
         text, kind = item
         if not text:
             continue
-        p = cell.paragraphs[0] if first else cell.add_paragraph()
-        first = False
         head = kind == "h"
-        X.para_props(p, rtl=True, align=("center" if align == "center" else
-                                         ("right" if head else "both")),
-                     space_before=0, space_after=(40 if head else 60),
-                     line=(260 if head else 290))
-        X.add_text_run(p, text,
-                       font=T.FONT_HEADING if head else T.FONT_BODY,
-                       size=(T.SZ_LABEL + 1 if head else T.SZ_BODY),
-                       bold=head, color=T.C_HEAD_TEXT if head else T.C_TEXT)
+        for piece in text.split("\n"):
+            if not piece.strip():
+                continue
+            p = cell.paragraphs[0] if first else cell.add_paragraph()
+            first = False
+            if head:
+                X.para_props(p, rtl=True,
+                             align=("center" if align == "center" else "right"),
+                             space_before=0, space_after=40, line=260,
+                             keep_next=True)
+                X.add_text_run(p, piece, font=T.FONT_HEADING,
+                               size=T.SZ_LABEL + 1, bold=True, color=T.C_HEAD_TEXT)
+            else:
+                X.para_props(p, rtl=True,
+                             align=("center" if align == "center" else "both"),
+                             space_before=0,
+                             space_after=(60 if align == "center" else 90),
+                             line=290,
+                             ind_first=(0 if align == "center" else 240))
+                X.add_text_run(p, piece, font=T.FONT_BODY,
+                               size=T.SZ_BODY, color=T.C_TEXT)
     if first:
         X.para_props(cell.paragraphs[0], rtl=True, align="center",
                      space_before=0, space_after=0, line=240)
@@ -419,16 +451,25 @@ def build_appendix(doc, model):
     pPr.append(X.el("w:pageBreakBefore", val="1"))
 
     for i, a in enumerate(items):
-        text = a["text"]
-        head = (i == 0 or text.startswith(("أولاً", "ثانياً", "ثالثاً",
-                                           "مفتاح الإجابة", "لوحة توضيحية",
-                                           "المصدر")))
-        p = doc.add_paragraph()
-        X.para_props(p, rtl=True, align="right" if head else "both",
-                     space_before=(160 if head else 0), space_after=40, line=280)
-        X.add_text_run(p, text, font=T.FONT_HEADING if head else T.FONT_BODY,
-                       size=(T.SZ_APPX_H if head else T.SZ_BODY),
-                       bold=head, color=(T.C_ACCENT_BLUE if head else T.C_TEXT))
+        for j, text in enumerate(S.segments(a["text"])):
+            if not text.strip():
+                continue
+            head = (j == 0 and (i == 0 or text.startswith(
+                ("أولاً", "ثانياً", "ثالثاً", "مفتاح الإجابة", "لوحة توضيحية",
+                 "المصدر"))))
+            p = doc.add_paragraph()
+            X.para_props(p, rtl=True,
+                         align="right" if head else "both",
+                         space_before=(220 if head else 0),
+                         space_after=(60 if head else 90),
+                         line=290,
+                         keep_next=head,
+                         ind_first=(0 if head else 240))
+            X.add_text_run(p, text.strip(),
+                           font=T.FONT_HEADING if head else T.FONT_BODY,
+                           size=(T.SZ_APPX_H if head else T.SZ_BODY),
+                           bold=head,
+                           color=(T.C_ACCENT_BLUE if head else T.C_TEXT))
 
 
 # --------------------------------------------------------------------------- #

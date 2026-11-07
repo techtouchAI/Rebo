@@ -57,14 +57,20 @@ def normalise_arabic(text: str) -> str:
       - Arabic thousands/date separators kept as-is
       - 'ـ' tatweel kept (it is a deliberate authoring choice: المقدمــــــة)
       - multiple spaces collapsed
-      - space before Arabic punctuation removed
-      - space after Arabic punctuation ensured
       - trailing/leading whitespace trimmed
+
+    WHAT IS REMOVED (whitespace only, never letters, never punctuation):
+      - NBSP  -> ordinary space   (two visually identical characters, one intent)
+      - runs of spaces/tabs inside a line -> one space
+      - trailing spaces at the end of a line
+      - the cell's own leading/trailing whitespace
+
+    WHAT IS NOT TOUCHED (the previous version got this wrong and *inserted*
+    punctuation spacing -- e.g. ".»." became ".» ." , which is a content change):
+      - spacing before/after punctuation is left exactly as the author wrote it.
     """
     t = text.replace("\u00a0", " ")
     t = re.sub(r"[ \t]{2,}", " ", t)
-    t = re.sub(r"\s+([،؛؟!»،:])", r"\1", t)       # no space before punctuation
-    t = re.sub(r"([،؛؟!»:])(?=[^\s،؛؟!»:])", r"\1 ", t)  # one space after
     t = re.sub(r"[ \t]+\n", "\n", t)
     t = re.sub(r"\n{3,}", "\n\n", t)
     return t.strip()

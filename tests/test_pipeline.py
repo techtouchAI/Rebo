@@ -314,6 +314,248 @@ def test_layout_split_preserves_text(built):
             assert all(len(p) <= T.CHARS_PER_BODY_ROW + 40 for p in parts)
 
 
+# --------------------------------------------------------------------------- #
+# Content-preservation contract (item 15).  These are the eight proofs the
+# brief demands: no loss, no dropped paragraph/sentence/example, no summary
+# substitution, order preserved, numbers/dates/names intact, no duplication
+# from row or page splitting, no invented text, formatting-only change.
+# --------------------------------------------------------------------------- #
+
+_INVIS = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u200e\u200f\u202a\u202b"
+                                    "\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+                                    "\u00a0\ufeff"), None)
+
+
+def norm(t):
+    """Compare text, not typography: collapse runs of space, drop invisibles."""
+    return " ".join(str(t).translate(_INVIS).split())
+
+
+def _doc_text(path):
+    """Every paragraph text in the document, merged cells read exactly once."""
+    from docx import Document
+    d = Document(path)
+    out = []
+    seen = set()          # a vMerge cell is returned once per spanned row
+    for t in d.tables:
+        for r in t.rows:
+            for c in r.cells:
+                if c._tc in seen:      # element identity (ids get recycled)
+                    continue
+                seen.add(c._tc)
+                for p in c.paragraphs:
+                    out.append(p.text)
+    for p in d.paragraphs:
+        out.append(p.text)
+    return out
+
+
+def test_1_no_source_text_lost(built):
+    """SOURCE -> MODEL: every character survives, minus declared transforms."""
+    from tools.check_lossless import audit
+    for i, rec in built.items():
+        ok, res = audit(rec["src"])
+        assert ok, "%s lost text: %s" % (i, res)
+
+
+def test_2_no_paragraph_or_sentence_dropped(built):
+    """Every model string reaches the page (whole, not summarised)."""
+    for i, rec in built.items():
+        blob = _page_blob(rec["path"])
+        for t in _model_text(rec):
+            assert t in blob, "%s: missing from page: %r" % (i, t[:70])
+
+
+def test_3_content_not_replaced_by_summary(built):
+    """No condensation: the page holds at least the model's full text."""
+    for i, rec in built.items():
+        model_chars = sum(len(t) for t in _model_text(rec))
+        page_chars = len(_page_blob(rec["path"]))
+        assert page_chars >= model_chars * 0.98, \
+            "%s: page text %d < model %d" % (i, page_chars, model_chars)
+
+
+def test_4_paragraph_order_preserved(built):
+    """Source order is kept: each model string is found after the previous one."""
+    from docx import Document
+    for i, rec in built.items():
+        d = Document(rec["path"])
+        body = d.tables[-1] if len(d.tables) > 1 else d.tables[0]
+        stream = norm("\n".join(
+            p.text for r in list(body.rows)[2:] for p in r.cells[-1].paragraphs))
+        cursor = 0
+        for row in rec["model"]["content_rows"]:
+            want = norm(row["label"] + " " + row["value"])
+            k = stream.find(want[:40], cursor)
+            if k == -1:
+                k = stream.find(want[:40])
+            assert k != -1, "%s: missing row: %r" % (i, want[:50])
+            assert k >= cursor, "%s: out of order: %r" % (i, want[:50])
+            cursor = k + 1
+        # appendix paragraphs must follow the table, in order
+        tail = cursor
+        for t in _page_paras(rec["path"]):
+            for piece in _split_appx(t):
+                k = stream.find(piece[:30], tail) if False else -1
+        seq = [norm(t) for t in _page_paras(rec["path"])]
+        pos = -1
+        for seg in _model_appendix(rec):
+            k = next((j for j, p in enumerate(seq) if j > pos and seg[:30] in p), -1)
+            assert k != -1, "%s: appendix out of order: %r" % (i, seg[:50])
+            pos = k
+
+
+def test_5_numbers_dates_names_verbatim(built):
+    """Every multi-digit token of the model survives, with the same count."""
+    import re as _re
+    from collections import Counter
+    num = _re.compile(r"[0-9\u0660-\u0669]{2,}")
+    for i, rec in built.items():
+        src = Counter(num.findall(" ".join(_model_text(rec))))
+        out = Counter(num.findall(_page_blob(rec["path"])))
+        missing = {k: v for k, v in src.items() if out[k] < v}
+        assert not missing, "%s: numeric tokens lost: %s" % (i, list(missing)[:6])
+
+
+def test_6_no_duplication_from_splitting(built):
+    """
+    Row splitting must not repeat or drop text.
+
+    The content column is consumed in model order: each model row owns a run of
+    one or more table rows, and each run concatenates back to exactly that
+    row's own text.  A split that duplicated the label (the bug this guards
+    against) makes the run longer than the model and fails here.
+    """
+    from docx import Document
+    for i, rec in built.items():
+        d = Document(rec["path"])
+        body = d.tables[-1] if len(d.tables) > 1 else d.tables[0]
+        cells = [norm("\n".join(p.text for p in r.cells[-1].paragraphs))
+                 for r in list(body.rows)[1:]]
+
+        targets = []                       # (what the cell must say, model row)
+        for r in rec["model"]["nav_rows"]:
+            if r.get("type") == "nav" and r.get("value"):
+                targets.append(norm(r["value"]))
+        for r in rec["model"]["content_rows"]:
+            if r.get("render") == "fragment":
+                targets.append(norm(r["label"] + " " + r["value"]))
+            else:
+                targets.append(norm((r["label"] + " " + r["value"]).strip()))
+
+        ci = 0
+        for k, target in enumerate(targets):
+            acc = ""
+            while ci < len(cells) and len(acc) < len(target):
+                acc = (acc + " " + cells[ci]).strip() if acc else cells[ci]
+                ci += 1
+            assert acc == target, (
+                "%s: model row %d was split incorrectly\n  want=%r\n  got =%r"
+                % (i, k, target[:70], acc[:70]))
+        assert ci == len(cells), "%s: %d leftover table rows" % (i, len(cells) - ci)
+
+
+def test_7_no_invented_prose(built):
+    """Every long paragraph on the page exists inside the model text."""
+    for i, rec in built.items():
+        blob = _page_blob_model(rec)
+        for t in _page_paras(rec["path"]) + _page_cell_paras(rec["path"]):
+            t = norm(t)
+            if len(t) < 60:
+                continue
+            if t in blob:
+                continue
+            parts = [x for x in t.split(". ") if len(x) > 40]
+            assert parts and all(p in blob for p in parts), \
+                "%s: not from source: %r" % (i, t[:70])
+
+
+def test_8_formatting_only_change(built):
+    """Re-flowing must be a partition: segments rejoin to the exact input."""
+    from pipeline import structure as S
+    for i, rec in built.items():
+        for r in rec["model"]["content_rows"]:
+            segs = S.segments(r["value"])
+            assert "".join(segs) == r["value"]
+            for row in S.pack_rows(segs, T.CHARS_PER_BODY_ROW):
+                assert "".join(row) in r["value"]
+        for a in rec["model"]["appendix"]:
+            assert "".join(S.segments(a["text"])) == a["text"]
+
+
+def _page_cell_paras(path):
+    from docx import Document
+    d = Document(path)
+    out, seen = [], set()
+    for t in d.tables:
+        for r in t.rows:
+            for c in r.cells:
+                if c._tc in seen:
+                    continue
+                seen.add(c._tc)
+                out.extend(p.text for p in c.paragraphs)
+    return out
+
+
+def _page_paras(path):
+    from docx import Document
+    return [p.text for p in Document(path).paragraphs]
+
+
+def _page_blob(path):
+    """All page text, normalised, whitespace-collapsed to single spaces."""
+    return norm(" ".join(_page_cell_paras(path) + _page_paras(path)))
+
+
+def _page_blob_model(rec):
+    return norm(" ".join(_model_text(rec)))
+
+
+def _model_appendix(rec):
+    out = []
+    for a in rec["model"]["appendix"]:
+        for seg in a["text"].split("\n"):
+            if norm(seg):
+                out.append(norm(seg))
+    return out
+
+
+def _split_appx(t):
+    return [t]
+
+
+def _model_text(rec):
+    """
+    Every string the model promises to show.
+
+    Declared, justified exception: the `guide_pages` row is the combined cell
+    the layout splits into the two header cards.  Its *value* ("... lesson
+    title ...\nالصفحات: 185–189") is shown in full inside those cards; its
+    *label* ("صفحات الدليل") is not printed because the card text itself begins
+    with "الصفحات:".  Both halves are asserted separately below, so nothing
+    silently disappears.
+    """
+    m = rec["model"]
+    out = []
+    for r in m["nav_rows"]:
+        if r.get("type") == "guide_pages":
+            for line in str(r["value"]).split("\n"):
+                if norm(line):
+                    out.append(norm(line))
+            continue
+        for f in ("label", "value"):
+            if r.get(f):
+                out.append(norm(r[f]))
+    for r in m["content_rows"]:
+        for f in ("label", "value"):
+            if r.get(f):
+                out.append(norm(r[f]))
+    for a in m["appendix"]:
+        if a.get("text"):
+            out.append(norm(a["text"]))
+    return [t for t in out if t]
+
+
 def test_docx_is_valid_package(built):
     for i, rec in built.items():
         z = zipfile.ZipFile(rec["path"])

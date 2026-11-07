@@ -285,6 +285,38 @@ class Preview:
         c.save()
         return self._pages
 
+    def _paint_header_row(self, tbl, tr, xs, widths, ytop):
+        """Draw a header row (used for tblHeader repetition)."""
+        c = self.c
+        h = 24.0
+        tp = tr.find(W + "trPr")
+        if tp is not None:
+            th = tp.find(W + "trHeight")
+            if th is not None:
+                h = max(20.0, tw2pt(int(th.get(W + "val"))))
+        for ci, tc in enumerate(tr.findall(W + "tc")):
+            if ci >= len(xs):
+                break
+            tcp = tc.find(W + "tcPr")
+            if tcp is not None:
+                shd = tcp.find(W + "shd")
+                if shd is not None and shd.get(W + "fill") not in (None, "auto"):
+                    c.setFillColor(HexColor("#" + shd.get(W + "fill")))
+                    c.rect(xs[ci], ytop - h, widths[ci], h, stroke=0, fill=1)
+            for p in tc.findall(W + "p"):
+                rs = self.runs_of(p)
+                if not rs:
+                    continue
+                text = "".join(r["t"] for r in rs)
+                size = max(r["sz"] for r in rs)
+                font = self.fonts["bold" if any(r["bold"] for r in rs) else "regular"]
+                fs = size / 2.0
+                c.setFont(font, fs)
+                c.setFillColor(HexColor(rs[0]["color"]))
+                ss = shape(text)
+                sw = pdfmetrics.stringWidth(ss, font, fs)
+                c.drawString(xs[ci] + (widths[ci] - sw) / 2.0, ytop - h / 2 - fs * 0.35, ss)
+
     def _header(self, c):
         """Render whatever the header part actually contains: images and/or a bar table."""
         s = self.sec
@@ -459,6 +491,12 @@ class Preview:
             return tw2pt(int(h.get(W + "val"))) if h is not None else 0.0
 
         for ri, tr in enumerate(trs):
+            if ri > 0 and hdr_idx == 0 and y - 40 < mb and not self._table_open:
+                # a real Word table repeats its tblHeader row at the page top
+                self._paint_header_row(tbl, trs[0], xs, widths, y)
+                y = tw2pt(s["h"]) - tw2pt(s["top"])
+                self._table_open = True
+            self._table_open = True
             cells = tr.findall(W + "tc")
             info = []
             for ci, tc in enumerate(cells):
