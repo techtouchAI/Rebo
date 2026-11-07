@@ -37,6 +37,7 @@ from bidi.algorithm import get_display
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+WP = "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}"
 
 TW = 1440.0
 PT = 72.0
@@ -61,6 +62,11 @@ def shape(text):
         return get_display(_reshaper.reshape(text))
     except Exception:
         return text
+
+
+def px2pt(emu):
+    """EMU (drawing extent) -> points."""
+    return float(emu) / 12700.0
 
 
 def tw2pt(v):
@@ -95,6 +101,7 @@ class Preview:
         """{'header': {'first': 'word/header2.xml', 'default': ...}, 'footer': {...}}"""
         out = {"header": {}, "footer": {}}
         docrels = self.rels("word/document.xml")
+        self._doc_rels = docrels
         sect = self.document.find(".//" + W + "sectPr")
         if sect is None:
             return out
@@ -205,7 +212,15 @@ class Preview:
             if before:
                 ops.append(("gap", tw2pt(before)))
             if not rs:
-                ops.append(("gap", 4.0))
+                blip = p.find(".//" + A + "blip")
+                if blip is not None:
+                    ext = p.find(".//" + WP + "extent")
+                    w_pt = px2pt(int(ext.get("cx"))) if ext is not None else width * 0.9
+                    h_pt = px2pt(int(ext.get("cy"))) if ext is not None else 60.0
+                    ops.append(("img", blip.get(R + "embed"),
+                                min(w_pt, width - 8), h_pt))
+                else:
+                    ops.append(("gap", 4.0))
             else:
                 text = "".join(r["t"] for r in rs)
                 size = max(r["sz"] for r in rs)
@@ -220,7 +235,11 @@ class Preview:
 
     @staticmethod
     def op_h(op):
-        return (op[2] / 2.0 * 1.45) if op[0] == "line" else op[1]
+        if op[0] == "line":
+            return op[2] / 2.0 * 1.45
+        if op[0] == "img":
+            return op[3] + 6.0
+        return op[1]
 
     # ---------------- paint ----------------
     def paint_ops(self, c, ops, x, y_top, width, max_h):
@@ -232,6 +251,19 @@ class Preview:
             h = self.op_h(op)
             if font_used + h > budget:
                 break
+            if op[0] == "img":
+                _k, rid, w_pt, h_pt = op
+                tgt = (self._doc_rels or {}).get(rid)
+                if tgt:
+                    data = self.img_bytes(tgt)
+                    if data:
+                        c.drawImage(ImageReader(io.BytesIO(data)),
+                                    x + (width - w_pt) / 2.0, ty - h_pt,
+                                    width=w_pt, height=h_pt,
+                                    preserveAspectRatio=True, anchor="n", mask="auto")
+                        ty -= h_pt + 6.0
+                        font_used += h_pt + 6.0
+                continue
             if op[0] == "line":
                 _k, ln, size, bold, color, align = op
                 font = self.fonts["bold" if bold else "regular"]
@@ -276,6 +308,9 @@ class Preview:
         for child in self.document.find(W + "body"):
             tag = child.tag.split("}")[1]
             if tag == "p":
+                need = self._para_height(child, text_w)
+                if need and y - need < mb:
+                    y = newpage()
                 y = self._para(c, child, ml, y, text_w)
                 if y < mb + 20:
                     y = newpage()
@@ -284,6 +319,15 @@ class Preview:
         self._footer(c)
         c.save()
         return self._pages
+
+    def _para_height(self, p, w):
+        """Height an image paragraph will need (0 for ordinary text)."""
+        blip = p.find(".//" + A + "blip")
+        if blip is None:
+            return 0.0
+        ext = p.find(".//" + WP + "extent")
+        h_pt = px2pt(int(ext.get("cy"))) if ext is not None else 120.0
+        return h_pt + 12.0
 
     def _paint_header_row(self, tbl, tr, xs, widths, ytop):
         """Draw a header row (used for tblHeader repetition)."""
@@ -439,6 +483,21 @@ class Preview:
         jc, before, after = self.pstyle(p)
         y -= tw2pt(before)
         if not rs:
+            blip = p.find(".//" + A + "blip")
+            if blip is not None:
+                ext = p.find(".//" + WP + "extent")
+                w_pt = px2pt(int(ext.get("cx"))) if ext is not None else w * 0.9
+                h_pt = px2pt(int(ext.get("cy"))) if ext is not None else 120.0
+                w_pt = min(w_pt, w - 4)
+                tgt = (self._doc_rels or {}).get(blip.get(R + "embed"))
+                if tgt:
+                    data = self.img_bytes(tgt)
+                    if data:
+                        c.drawImage(ImageReader(io.BytesIO(data)),
+                                    x + (w - w_pt) / 2.0, y - h_pt,
+                                    width=w_pt, height=h_pt,
+                                    preserveAspectRatio=True, anchor="n", mask="auto")
+                        return y - h_pt - tw2pt(after) - 6
             return y - tw2pt(after) - 5
         text = "".join(r["t"] for r in rs)
         size = max(r["sz"] for r in rs)

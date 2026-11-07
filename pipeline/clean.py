@@ -16,6 +16,8 @@ every single edit.
 """
 from __future__ import annotations
 
+import base64
+
 import re
 from dataclasses import dataclass, asdict
 from typing import Iterable
@@ -172,6 +174,8 @@ def clean_document(ext, doc_id: str) -> tuple[dict, list[Change]]:
     appendix = []
     for i, p in enumerate(ext.appendix):
         t = clean_field(p.text, i, "appendix")
+        if not t.strip() and not p.has_drawing:
+            continue          # empty spacer paragraphs carry no content
         appendix.append({
             "text": t,
             "has_drawing": p.has_drawing,
@@ -213,7 +217,12 @@ def clean_document(ext, doc_id: str) -> tuple[dict, list[Change]]:
         "nav_rows": nav_rows,
         "content_rows": content_rows,
         "appendix": appendix,
-        "media": [{"part": n, "size": len(b)} for n, b in ext.media],
+        # The source images travel with the model so stage 5 can place them
+        # back at the exact point the source had them (the لوحة توضيحية).
+        # base64 keeps the model a single portable JSON file.
+        "media": [{"part": n, "size": len(b),
+                   "b64": base64.b64encode(b).decode("ascii")}
+                  for n, b in ext.media],
         "absorbed": absorbed,
         "header_labels": header_labels,
     }

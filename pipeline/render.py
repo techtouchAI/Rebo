@@ -21,6 +21,7 @@ physical RIGHT edge, which reproduces the artwork exactly.
 from __future__ import annotations
 
 import os
+import tempfile
 
 from docx import Document
 from docx.shared import Inches
@@ -80,74 +81,68 @@ def _rtl_defaults(doc):
         rPr.append(X.el("w:rtl", val="1"))
 
 
-def _pic_para(container, png, width_in):
+def _pic_para(container, png, width_in, max_h=None):
+    """Place artwork at the text width, optionally capped in height."""
     p = container.add_paragraph()
     X.para_props(p, rtl=True, align="center", space_before=0, space_after=0, line=240)
-    p.add_run().add_picture(png, width=Inches(width_in))
+    run = p.add_run()
+    if max_h:
+        run.add_picture(png, width=Inches(width_in),
+                        height=Inches(min(max_h / 1440.0,
+                                          width_in * 1.0)))
+    else:
+        run.add_picture(png, width=Inches(width_in))
     return p
 
 
 # --------------------------------------------------------------------------- #
 def build_headers(section, model):
     """
-    First page  : full banner artwork (holds the constant title).
-    Later pages : slim navy running bar.
-    A full-page-height banner on every page would consume 84% of the writing area,
-    so the design's header treatment is applied to page 1 and reduced thereafter.
+    One visual identity on EVERY page.
+
+    Page 1        : full banner artwork (it already carries the title).
+    Pages 2+      : a slimmer crop of the SAME artwork.  Losing the illustration
+                    entirely would turn continuation pages into blank sheets with
+                    a grey rule, which is exactly the defect this replaces.  The
+                    slim band costs ~11mm, not the 25mm of the full banner.
     """
     section.different_first_page_header_footer = True
-    banner = os.path.join(ASSET_DIR, "banner.png")
     text_w = T.TEXT_W_TWIPS / 1440
 
     hdr = section.header
     hdr.is_linked_to_previous = False
     for p in list(hdr.paragraphs):
         p._p.getparent().remove(p._p)
-    _pic_para(hdr, banner, text_w)
-    # pages 2+ must not print the banner again
-    for p in hdr.paragraphs:
-        for r in p.runs:
-            pass
-    # hide the banner on continuation pages by putting it in the first-page header
-    # and leaving the default header with the running bar only
-    for p in list(hdr.paragraphs):
-        p._p.getparent().remove(p._p)
-    bar = hdr.add_table(rows=1, cols=1, width=Inches(text_w))
-    X.tbl_pr_ordered(bar, T.TEXT_W_TWIPS)
-    bar.autofit = False
-    X.table_set_grid(bar, [T.TEXT_W_TWIPS])
-    cell = bar.rows[0].cells[0]
-    cell_shade(cell, T.C_BANNER_NAVY)
-    _cell_frame(cell, pad=40)
-    par = cell.paragraphs[0]
-    X.para_props(par, rtl=True, align="center", space_before=20, space_after=20, line=240)
-    X.add_text_run(par, T.TITLE_TEXT, font=T.FONT_HEADING, size=T.SZ_RUNNING,
-                   bold=True, color="FFFFFF")
+    _pic_para(hdr, os.path.join(ASSET_DIR, "banner_slim.png"), text_w)
 
     fp = section.first_page_header
     fp.is_linked_to_previous = False
     for q in list(fp.paragraphs):
         q._p.getparent().remove(q._p)
-    _pic_para(fp, banner, text_w)
+    _pic_para(fp, os.path.join(ASSET_DIR, "banner.png"), text_w)
 
 
 def build_footers(section, model):
+    """
+    The wave footer sits on every page, page 1 included, so the frame closes
+    consistently.  The page number line rides underneath it.
+    """
     section.different_first_page_header_footer = True
-    wave = os.path.join(ASSET_DIR, "footer_wave.png")
     text_w = T.TEXT_W_TWIPS / 1440
+    wave = os.path.join(ASSET_DIR, "footer_wave.png")
 
     ftr = section.footer
     ftr.is_linked_to_previous = False
     for p in list(ftr.paragraphs):
         p._p.getparent().remove(p._p)
-    _rule_para(ftr)
+    _pic_para(ftr, wave, text_w, max_h=T.FOOTER_MAX_H_TWIPS)
     _page_line(ftr)
 
     ff = section.first_page_footer
     ff.is_linked_to_previous = False
     for q in list(ff.paragraphs):
         q._p.getparent().remove(q._p)
-    _pic_para(ff, wave, text_w)
+    _pic_para(ff, wave, text_w, max_h=T.FOOTER_MAX_H_TWIPS)
     _page_line(ff)
 
 
@@ -441,7 +436,18 @@ def _write(blocks, cell, align="both"):
 
 # --------------------------------------------------------------------------- #
 def build_appendix(doc, model):
-    items = [a for a in model["appendix"] if a.get("text")]
+    """
+    Render the summary / questions / answer-key block.
+
+    The source carries a figure (the «لوحة توضيحية») as a drawing paragraph
+    between the caption and the source line.  It is placed back at that exact
+    point: dropping it would lose teaching material that the caption refers to.
+
+    The ellipses and fragments in this block are the AUTHOR'S OWN: they are
+    stored in the source .docx as "\u2026".  This module reproduces them
+    character for character and never writes one itself (test 7 proves it).
+    """
+    items = [a for a in model["appendix"] if a.get("text") or a.get("has_drawing")]
     if not items:
         return
     sep = doc.add_paragraph()
@@ -450,7 +456,14 @@ def build_appendix(doc, model):
     pPr = sep._p.find(qn("w:pPr"))
     pPr.append(X.el("w:pageBreakBefore", val="1"))
 
+    media = _media_parts(model)
+    fig_no = 0
+    last = len(items) - 1
     for i, a in enumerate(items):
+        if a.get("has_drawing"):
+            _place_figure(doc, media, fig_no)
+            fig_no += 1
+            continue
         for j, text in enumerate(S.segments(a["text"])):
             if not text.strip():
                 continue
@@ -459,7 +472,8 @@ def build_appendix(doc, model):
                  "المصدر"))))
             p = doc.add_paragraph()
             X.para_props(p, rtl=True,
-                         align="right" if head else "both",
+                         align=("center" if text.strip().startswith("المصدر") else
+                                ("right" if head else "both")),
                          space_before=(220 if head else 0),
                          space_after=(60 if head else 90),
                          line=290,
@@ -470,6 +484,146 @@ def build_appendix(doc, model):
                            size=(T.SZ_APPX_H if head else T.SZ_BODY),
                            bold=head,
                            color=(T.C_ACCENT_BLUE if head else T.C_TEXT))
+
+
+def _media_parts(model):
+    """Source images carried on the model, decoded from base64."""
+    import base64
+    out = []
+    for item in model.get("media", []):
+        try:
+            out.append((item["part"], base64.b64decode(item["b64"])))
+        except Exception:
+            continue
+    return out
+
+
+def _crop_white(path, tol=246):
+    """
+    Trim the blank page margin from a source scan.
+
+    The لوحة توضيحية arrives as a full-page scan: two small paintings floating
+    on ~85% white.  Placing that scan whole makes the artwork a thumbnail.  This
+    crops to the ink bounding box and returns a NEW temporary file -- the source
+    image in the .docx is never touched.
+    """
+    try:
+        from PIL import Image as _Img, ImageChops
+        im = _Img.open(path).convert("RGB")
+        bg = _Img.new("RGB", im.size, (255, 255, 255))
+        diff = ImageChops.difference(im, bg).convert("L")
+        mask = diff.point(lambda v: 255 if v > (255 - tol) else 0)
+        box = mask.getbbox()
+        if not box:
+            return path
+        pad = 8
+        box = (max(0, box[0] - pad), max(0, box[1] - pad),
+               min(im.size[0], box[2] + pad), min(im.size[1], box[3] + pad))
+        out = path.replace(".", "_crop.", 1)
+        im.crop(box).save(out, "JPEG", quality=92)
+        return out
+    except Exception:
+        return path
+
+
+def _figure_compose(path):
+    """
+    Lay the source's paintings out side by side.
+
+    The scan is a full page: two paintings stacked vertically with a wide blank
+    gap between them, which crops to a 1:2.4 sliver -- unreadable at any width
+    that fits the page.  This splits the scan at its blank bands and packs the
+    bands horizontally (first band rightmost, keeping reading order), then
+    writes a NEW temporary file.
+
+    Every pixel of artwork is preserved; only the blank gap between the two
+    paintings is reduced.  The image inside the source .docx is never modified.
+    """
+    try:
+        from PIL import Image as _Img
+        im = _Img.open(path).convert("RGB")
+    except Exception:
+        return path
+    w, h = im.size
+    px = im.load()
+
+    def row_has_ink(y):
+        step = max(1, w // 200)
+        for x in range(0, w, step):
+            r, g, b = px[x, y]
+            if r < 246 or g < 246 or b < 246:
+                return True
+        return False
+
+    bands, start = [], None
+    blank = 0
+    gap_min = max(6, h // 60)
+    for y in range(h):
+        if row_has_ink(y):
+            if start is None:
+                start = y
+            blank = 0
+        else:
+            if start is not None:
+                blank += 1
+                if blank >= gap_min:
+                    bands.append((start, y - blank))
+                    start = None
+    if start is not None:
+        bands.append((start, h - 1))
+    bands = [(a, b) for a, b in bands if b - a > h * 0.05]
+    if len(bands) < 2:
+        return path
+
+    crops = [im.crop((0, a, w, b + 1)) for a, b in bands]
+    pad = max(6, w // 80)
+    total_w = sum(c.size[0] for c in crops) + pad * (len(crops) - 1)
+    max_h = max(c.size[1] for c in crops)
+    canvas = _Img.new("RGB", (total_w, max_h), (255, 255, 255))
+    x = 0
+    for c in reversed(crops):          # first band goes to the right (RTL)
+        canvas.paste(c, (x, (max_h - c.size[1]) // 2))
+        x += c.size[0] + pad
+    out = path.replace(".", "_wide.", 1)
+    canvas.save(out, "JPEG", quality=92)
+    return out
+
+
+def _place_figure(doc, media, index):
+    """
+    Insert the source's own illustration, centred and legible.
+
+    Composition (blank-gap removal) happens in _figure_compose; sizing is fitted
+    to the content column so the «المصدر» line that follows stays with it.
+    """
+    if not media:
+        return
+    name, blob = media[min(index, len(media) - 1)]
+    ext = os.path.splitext(name)[1].lower() or ".jpg"
+    raw = os.path.join(tempfile.gettempdir(), "rebo_fig_%d%s" % (index, ext))
+    with open(raw, "wb") as fh:
+        fh.write(blob)
+    path = _figure_compose(_crop_white(raw))
+
+    max_h_in = T.FIGURE_MAX_H_TWIPS / 1440.0
+    max_w_in = T.FIGURE_MAX_W_TWIPS / 1440.0
+    try:
+        from PIL import Image as _Img
+        with _Img.open(path) as im:
+            w_px, h_px = im.size
+        aspect = w_px / float(h_px)
+    except Exception:
+        aspect = 1.0
+    width = min(max_w_in, max_h_in * aspect)
+    height = width / aspect if aspect else max_h_in
+    if height > max_h_in:
+        height = max_h_in
+        width = height * aspect
+
+    p = doc.add_paragraph()
+    X.para_props(p, rtl=True, align="center", space_before=140, space_after=180,
+                 line=240, keep_next=True)
+    p.add_run().add_picture(path, width=Inches(width), height=Inches(height))
 
 
 # --------------------------------------------------------------------------- #

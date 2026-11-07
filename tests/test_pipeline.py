@@ -483,6 +483,19 @@ def test_8_formatting_only_change(built):
             assert "".join(S.segments(a["text"])) == a["text"]
 
 
+def _all_text(ext):
+    """Flatten an extracted document to the list of source cell texts."""
+    out = []
+    for r in ext.rows:
+        for v in (r.c0, r.c1, r.c2, r.c3):
+            if v:
+                out.append(v)
+    for a in ext.appendix:
+        if a.text:
+            out.append(a.text)
+    return out
+
+
 def _page_cell_paras(path):
     from docx import Document
     d = Document(path)
@@ -554,6 +567,39 @@ def _model_text(rec):
         if a.get("text"):
             out.append(norm(a["text"]))
     return [t for t in out if t]
+
+
+def test_9_source_figure_is_carried(built):
+    """A drawing in the source must appear as a drawing in the sample."""
+    import zipfile
+    from pipeline import extract as EX
+    for i, rec in built.items():
+        src = EX.extract(rec["src"])
+        if not src.media:
+            continue
+        z = zipfile.ZipFile(rec["path"])
+        media = [n for n in z.namelist() if n.startswith("word/media/")]
+        doc = z.read("word/document.xml").decode()
+        assert media, "%s: source had an image, output has none" % i
+        assert "a:blip" in doc, "%s: image embedded but never referenced" % i
+
+
+def test_10_ellipses_are_the_author_s(built):
+    """
+    The «…» that end several summary bullets are stored in the SOURCE.
+    The engine must never add one of its own.
+    """
+    from pipeline import extract as EX
+    for i, rec in built.items():
+        src = norm(" ".join(_all_text(EX.extract(rec["src"]))))
+        page = _page_blob(rec["path"])
+        assert page.count("\u2026") <= src.count("\u2026"), \
+            "%s: engine invented an ellipsis" % i
+        # and every source bullet that ends in … still ends in it
+        for a in rec["model"]["appendix"]:
+            t = norm(a.get("text", ""))
+            if t.endswith("\u2026"):
+                assert t in page, "%s: truncated-looking bullet was altered: %r" % (i, t[-40:])
 
 
 def test_docx_is_valid_package(built):
