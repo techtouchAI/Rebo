@@ -81,6 +81,26 @@ def _rtl_defaults(doc):
         rPr.append(X.el("w:rtl", val="1"))
 
 
+_DRAW_ID = [1000]
+
+
+def _next_id():
+    _DRAW_ID[0] += 1
+    return _DRAW_ID[0]
+
+
+def _reid(container):
+    """
+    Give every drawing in this part a unique docPr id.
+
+    python-docx restarts ids at 1 in every part, but Word requires them to be
+    unique document-wide; duplicates make pictures silently disappear -- the
+    «figure does not appear» bug.
+    """
+    for pr in container._element.iter(qn("wp:docPr")):
+        pr.set("id", str(_next_id()))
+
+
 def _pic_para(container, png, width_in, max_h=None):
     """Place artwork at the text width, optionally capped in height."""
     p = container.add_paragraph()
@@ -92,6 +112,7 @@ def _pic_para(container, png, width_in, max_h=None):
                                           width_in * 1.0)))
     else:
         run.add_picture(png, width=Inches(width_in))
+    _reid(container)
     return p
 
 
@@ -136,14 +157,14 @@ def build_footers(section, model):
     for p in list(ftr.paragraphs):
         p._p.getparent().remove(p._p)
     _pic_para(ftr, wave, text_w, max_h=T.FOOTER_MAX_H_TWIPS)
-    _page_line(ftr)
+    _page_line(ftr, 1, getattr(section, "_rebo_pages", None))
 
     ff = section.first_page_footer
     ff.is_linked_to_previous = False
     for q in list(ff.paragraphs):
         q._p.getparent().remove(q._p)
     _pic_para(ff, wave, text_w, max_h=T.FOOTER_MAX_H_TWIPS)
-    _page_line(ff)
+    _page_line(ff, 1, getattr(section, "_rebo_pages", None))
 
 
 def _rule_para(container):
@@ -156,17 +177,28 @@ def _rule_para(container):
     return p
 
 
-def _page_line(container):
-    """«التربية الفنية  •  صفحة X من Y» with real PAGE/NUMPAGES fields."""
+def _page_line(container, page_no=None, total=None):
+    """
+    «التربية الفنية  •  صفحة X من Y» with real PAGE/NUMPAGES fields.
+
+    A field's cached result is what Word shows until it recalculates.  Writing
+    "1" for every page showed a stale number, and a field Word cannot evaluate
+    is what renders as its error glyphs (the "XX" reported in review).  The
+    cache therefore holds the real value, and settings.xml asks Word to refresh
+    fields on open.
+    """
     p = container.add_paragraph()
     X.para_props(p, rtl=True, align="center", space_before=20, space_after=0, line=240)
 
-    def field(instr):
+    def field(instr, cached):
         r = OxmlElement("w:r")
+        rPr = OxmlElement("w:rPr")
+        X.make_run_props(rPr, font=T.FONT_BODY, size=T.SZ_FOOTER, color=T.C_RULE)
+        r.append(rPr)
         f1 = OxmlElement("w:fldChar"); f1.set(qn("w:fldCharType"), "begin")
         it = OxmlElement("w:instrText"); it.set(qn("xml:space"), "preserve"); it.text = instr
         f2 = OxmlElement("w:fldChar"); f2.set(qn("w:fldCharType"), "separate")
-        t = OxmlElement("w:t"); t.text = "1"
+        t = OxmlElement("w:t"); t.text = str(cached)
         f3 = OxmlElement("w:fldChar"); f3.set(qn("w:fldCharType"), "end")
         for e in (f1, it, f2, t, f3):
             r.append(e)
@@ -174,9 +206,18 @@ def _page_line(container):
 
     X.add_text_run(p, T.FOOTER_PREFIX + "  •  صفحة ", font=T.FONT_BODY,
                    size=T.SZ_FOOTER, color=T.C_RULE)
-    field(" PAGE ")
+    field(" PAGE ", page_no if page_no else 1)
     X.add_text_run(p, " من ", font=T.FONT_BODY, size=T.SZ_FOOTER, color=T.C_RULE)
-    field(" NUMPAGES ")
+    field(" NUMPAGES ", total if total else 1)
+
+
+def enable_field_update(doc):
+    """Tell Word to recalculate fields when the file is opened."""
+    settings = doc.settings.element
+    if settings.find(qn("w:updateFields")) is None:
+        uf = OxmlElement("w:updateFields")
+        uf.set(qn("w:val"), "true")
+        settings.append(uf)
 
 
 def cell_shade(cell, fill):
@@ -624,10 +665,19 @@ def _place_figure(doc, media, index):
     X.para_props(p, rtl=True, align="center", space_before=140, space_after=180,
                  line=240, keep_next=True)
     p.add_run().add_picture(path, width=Inches(width), height=Inches(height))
+    for pr in p._p.iter(qn("wp:docPr")):
+        pr.set("id", str(_next_id()))
 
 
 # --------------------------------------------------------------------------- #
-def render(model, out_path):
+def render(model, out_path, total_pages=None):
+    """
+    Build the DOCX.
+
+    `total_pages` fills the cached NUMPAGES result so a reader that does not
+    recalculate fields still shows the right number.
+    """
+    _DRAW_ID[0] = 1000          # ids must be reproducible run to run
     doc = Document()
     _rtl_defaults(doc)
     section = setup_section(doc)
@@ -637,6 +687,7 @@ def render(model, out_path):
         body.remove(p)
 
     build_headers(section, model)
+    section._rebo_pages = total_pages
     build_footers(section, model)
     build_meta_cards(doc, model)
     build_plan_table(doc, model, 1)
@@ -650,5 +701,6 @@ def render(model, out_path):
     cp.subject = model.get("subject", "التربية الفنية")
     cp.author = "techtouchAI / Rebo pipeline"
     cp.comments = "Generated deterministically from %s" % os.path.basename(model.get("source", ""))
+    enable_field_update(doc)
     doc.save(out_path)
     return out_path

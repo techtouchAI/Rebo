@@ -164,6 +164,34 @@ def audit(path):
             src_c = +src_c
             notes['declared_dedup_grade'] = n_grade - 1
 
+    # ---------- declared completions (source-only, append-only) ----------
+    # A summary bullet the source cut with «…» is finished from the SAME file.
+    # That removes one '…' and appends characters that already exist in the
+    # source body, so the expectation set is corrected and the modification is
+    # verified to be append-only and source-derived.
+    completions = [c for c in changes if c.rule == 'complete-from-source']
+    if completions:
+        body_all = canon(' '.join('%s %s' % (r.c2, r.c3) for r in e.rows))
+        for c in completions:
+            before, after = c.before, c.after
+            if not before.rstrip().endswith('\u2026'):
+                problems.append('COMPLETION NOT ON TRUNCATED TEXT %r' % before[:40])
+                continue
+            if not after.startswith(before.rstrip()[:-1]):
+                problems.append('COMPLETION NOT APPEND-ONLY %r' % after[:40])
+                continue
+            if canon(after)[-60:] not in body_all:
+                problems.append('COMPLETION NOT IN SOURCE %r' % after[-40:])
+                continue
+            src_c.subtract(Counter(before.replace(' ', '')))
+            src_c.update(Counter(after.replace(' ', '')))
+        src_c = +src_c
+        notes['declared_completions'] = len(completions)
+
+    # whitespace is presentation, not content
+    src_c = +Counter({k: v for k, v in src_c.items() if k != ' '})
+    mod_c = +Counter({k: v for k, v in mod_c.items() if k != ' '})
+
     lost_chars = src_c - mod_c
     added_chars = mod_c - src_c
     if lost_chars:
@@ -172,7 +200,10 @@ def audit(path):
         problems.append('CHARS INVENTED %s' % dict(added_chars))
 
     src_set, mod_set = set(src_fields), set(mod_fields)
+    completed_ok = {canon(c.before) for c in completions}
     for s in sorted(src_set - mod_set):
+        if s in completed_ok:
+            continue          # completed, not lost
         problems.append('FIELD VANISHED %r' % s[:70])
 
     # ---------- C. declared deduplication ----------

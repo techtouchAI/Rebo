@@ -78,27 +78,81 @@ def normalise_arabic(text: str) -> str:
     return t.strip()
 
 
+ORDINAL_STARTS = ("أولاً", "أولًا", "ثانياً", "ثانيًا", "ثالثاً", "ثالثًا",
+                  "رابعاً", "رابعًا", "خامساً", "خامسًا", "سادساً", "سادسًا")
+SECTION_WORDS = ("اشغال", "أشغال", "الأشغال", "أعمال", "اعمال")
+HEADING_MAX_WORDS = 6
+HEADING_MAX_CHARS = 45
+
+
+def looks_like_heading(label: str) -> bool:
+    """
+    True only for a title the SOURCE marks as a section heading.
+
+    Evidence (all from the source, none invented): short (<=6 words / 45 chars,
+    no mid-sentence full stop) OR starting with an ordinal or a section word.
+    Length alone is NOT evidence -- that is what mislabelled «الأهداف» and
+    «المحاور» as headings.
+    """
+    t = " ".join((label or "").split())
+    if not t:
+        return False
+    if len(t) <= HEADING_MAX_CHARS and len(t.split()) <= HEADING_MAX_WORDS:
+        if t.rstrip(".").find(".", 1) == -1:
+            return True
+    return t.split()[0] in ORDINAL_STARTS or t.split()[0] in SECTION_WORDS
+
+
+def complete_truncated_bullets(appendix, body_text):
+    """
+    Finish a summary bullet the SOURCE cut with «…» -- from the source.
+
+    The bullet stops mid-sentence because the author pasted only the first N
+    characters of a sentence that exists, in full, in the same file.  We drop
+    the «…» and append the next characters up to the source's own end of that
+    sentence.  Nothing is paraphrased: every appended character is copied from
+    the body where the bullet's own last words occur.
+
+    Returns (new_text, appended).  appended == "" means no exact continuation
+    was found, so the bullet is left EXACTLY as the source has it.
+    """
+    t = appendix or ""
+    if not t.rstrip().endswith("\u2026"):
+        return t, ""
+    head = t.rstrip()[:-1]
+    pos, key = -1, ""
+    for n in (40, 32, 24, 18, 14, 10):
+        cand = head[-n:]
+        if not cand.strip():
+            continue
+        k = body_text.find(cand)
+        if k >= 0:
+            pos, key = k, cand
+            break
+    if pos < 0:
+        return t, ""
+    tail = body_text[pos + len(key):]
+    stops = [i for i in (tail.find(". "), tail.find(" - "), tail.find("؛ "),
+                         tail.find(":")) if i >= 0]
+    if not stops:
+        return t, ""
+    addition = tail[:min(stops) + 1]
+    if not addition.strip() or len(addition) > 200:
+        return t, ""
+    return head + addition, addition
+
+
 def classify_label(label: str, content: str) -> tuple[str, str, str | None]:
     """
     Decide how a row's label should be RENDERED, without touching the text.
 
-    The source table splits many sentences across the label and content cells
-    (110 of 200 rows): the "label" is really the opening fragment of the
-    content paragraph.  We cannot repair that without inventing punctuation,
-    so we keep every character exactly as extracted and only record a layout
-    hint:
-
-        'heading'  -> render the label as a bold sub-heading above the content
-        'fragment' -> render label+content as ONE flowing paragraph
-
-    Returns (label, content, hint).
+        'heading'  -> a title the source marks as a heading
+        'fragment' -> prose split across the label and content cells: re-flow
+                      both into ONE paragraph so the sentence reads as written
     """
     if not label:
         return label, content, None
-    shown = label if len(label) <= LABEL_COL_MAX_CHARS else label
-    if len(label) <= LABEL_COL_MAX_CHARS:
-        return label, content, "heading"
-    return label, content, "fragment"
+    return label, content, ("heading" if looks_like_heading(label) else "fragment")
 
 
 def _looks_like_nav(label: str) -> bool:
@@ -172,11 +226,18 @@ def clean_document(ext, doc_id: str) -> tuple[dict, list[Change]]:
 
     # ---------------- appendix ----------------
     appendix = []
+    # the lesson body, used only to FINISH a bullet the source left with «…»
+    body_text = " ".join("%s %s" % (r.c2, r.c3) for r in ext.rows)
     for i, p in enumerate(ext.appendix):
         t = clean_field(p.text, i, "appendix")
         if not t.strip() and not p.has_drawing:
             continue          # empty spacer paragraphs carry no content
+        finished, added = complete_truncated_bullets(t, body_text)
+        if added:
+            changes.append(Change(i, "appendix", "complete-from-source", t, finished))
+            t = finished
         appendix.append({
+            "completed_from_source": bool(added),
             "text": t,
             "has_drawing": p.has_drawing,
             "style": p.style,

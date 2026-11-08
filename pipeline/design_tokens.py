@@ -80,7 +80,7 @@ SZ_RUNNING = 18
 FOOTER_MAX_H_TWIPS = 510
 # The لوحة توضيحية figure is a portrait scan; 2.6in keeps it beside its caption
 # instead of orphaning it onto a page of its own.
-FIGURE_MAX_H_TWIPS = 3300
+FIGURE_MAX_H_TWIPS = 2450
 # the artwork is fitted to this width: wide enough to be legible, narrow enough
 # that the caption and the source line stay with it on the same page
 FIGURE_MAX_W_TWIPS = 6200

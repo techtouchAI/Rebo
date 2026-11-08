@@ -33,8 +33,8 @@ ENDERS = (". ", "؟ ", "! ", ": ", "… ", "» ")
 # A paragraph of 380-450 characters fills roughly 7-8 lines of the 3.85in
 # content column: long enough to read as a paragraph, short enough that the eye
 # finds its place again. These are DISPLAY targets, not content limits.
-PARA_MAX = 430
-PARA_MIN = 80          # never leave a stub paragraph shorter than this behind
+PARA_MAX = 320
+PARA_MIN = 90          # never leave a stub paragraph shorter than this behind
 PARA_HARD = 900        # a single unpunctuated run longer than this is split at a space
 
 
@@ -96,6 +96,17 @@ def segments(text):
 
     out = []
     for bi, block in enumerate(blocks):
+        if len(block) >= PARA_MAX * 1.4:
+            parts = _split_labelled_steps(block)
+            if len(parts) > 1:
+                step_out = []
+                for part in parts:
+                    step_out.extend(_split_block(part) if len(part) > PARA_MAX
+                                    else [part])
+                if bi < len(blocks) - 1:
+                    step_out[-1] = step_out[-1] + STRONG
+                out.extend(step_out)
+                continue
         # re-attach the newline to the block it terminated, so the concatenation
         # stays exact when we later re-split on display targets
         piece_out = _split_block(block)
@@ -104,6 +115,30 @@ def segments(text):
         out.extend(piece_out)
     assert "".join(out) == text, "segmentation altered the text"
     return out
+
+
+def _split_labelled_steps(seg):
+    """
+    Put each numbered step on its own paragraph.
+
+    Source steps are written inline: «1 املأ الاناء ... 2 نسكب الجبس ...».
+    Cutting only at an existing " N " marker preserves every character and
+    turns one wall of text into the ordered procedure the author described.
+    """
+    import re as _re
+    marks = list(_re.finditer(r"(?<=\s)([0-9]{1,2})(?=\s\S)", seg))
+    if len(marks) < 2:
+        return [seg]
+    nums = [int(m.group(1)) for m in marks]
+    if nums != sorted(nums) or len(set(nums)) != len(nums):
+        return [seg]          # not a real numbered sequence
+    out, prev = [], 0
+    for m in marks[1:]:
+        out.append(seg[prev:m.start()])
+        prev = m.start()
+    out.append(seg[prev:])
+    assert "".join(out) == seg
+    return [o for o in out if o.strip()] or [seg]
 
 
 def _split_block(block):

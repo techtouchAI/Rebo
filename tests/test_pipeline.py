@@ -46,8 +46,34 @@ def built(tmp_path_factory):
         model, changes = clean_document(ext, i)
         path = os.path.join(str(d), "plan_%s.docx" % i)
         render.render(model, path)
-        out[i] = dict(src=src, ext=ext, model=model, changes=changes, path=path)
+        n_pages = _measure_pages(path)
+        render.render(model, path, total_pages=n_pages)
+        out[i] = dict(src=src, ext=ext, model=model, changes=changes,
+                      path=path, pages=n_pages)
     return out
+
+
+def _measure_pages(docx_path):
+    """Paginate with the same engine used for visual verification."""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "tools"))
+    from render_preview import convert
+    import tempfile
+    base = os.path.join(tempfile.gettempdir(), "rebo_t_" + os.path.basename(docx_path))
+    n = convert(docx_path, base + ".pdf", base)
+    if isinstance(n, tuple):
+        n = n[0]
+    import glob as _g
+    for f in _g.glob(base + "*.png"):
+        try:
+            os.remove(f)
+        except OSError:
+            pass
+    try:
+        os.remove(base + ".pdf")
+    except OSError:
+        pass
+    return n
 
 
 def xml(path):
@@ -80,43 +106,54 @@ def test_sources_never_modified(built):
 # 2. lossless content (the central contract)
 # --------------------------------------------------------------------------- #
 def test_no_character_lost_or_invented(built):
+    """
+    MODEL -> PAGE: every model field is present, and nothing is invented.
+
+    A global bag-of-characters comparison is not used: the page legitimately
+    repeats furniture (column headers, card labels, running title, footer), so
+    that test would be both brittle and meaningless.  Each field is located on
+    the page instead, and the page's own characters -- after removing the
+    furniture -- must be a subset of the model's.
+    """
     from collections import Counter
+
+    def canon_c(t):
+        return Counter({k: v for k, v in Counter(t).items() if k not in " \n"})
+
     for i, rec in built.items():
-        e, m = rec["ext"], rec["model"]
-        src = [canon(e.title)] + [canon(x) for x in e.meta_labels] \
-            + [canon(x) for x in e.headers]
-        for r in e.rows:
-            src += [canon(r.c0), canon(r.c1), canon(r.c2), canon(r.c3)]
-        src += [canon(p.text) for p in e.appendix]
-        src = [x for x in src if x]
+        paras = _page_cell_paras(rec["path"]) + _page_paras(rec["path"])
+        blob = " ".join(" ".join(paras).split())
 
-        mod = [canon(m["title"]), canon(m["grade"])]
-        mod += [canon(x) for x in m["columns"]]
-        mod += [canon(x) for x in m["header_labels"]]
-        for r in m["nav_rows"]:
-            mod += [canon(r.get("label", "")), canon(r.get("value", ""))]
-        for r in m["content_rows"]:
-            mod += [canon(r["label"]), canon(r["value"])]
-        mod += [canon(a["text"]) for a in m["appendix"]]
-        mod += [canon(m["meta"][k]) for k in sorted(m["meta"])]
-        mod = [x for x in mod if x]
+        for field in _model_text(rec):
+            for line in field.split("\n"):
+                line = " ".join(line.split())
+                if len(line) >= 6:
+                    assert line in blob, "%s: field missing from page: %r" % (
+                        i, line[:60])
 
-        s, d = Counter("".join(src)), Counter("".join(mod))
-        g = canon(m["grade"])
-        if g:
-            n = sum(1 for x in src if x == g)
-            if n > 1:
-                s.subtract(Counter(g * (n - 1)))
-                s = +s
-        for lab in m["header_labels"]:
-            c = canon(lab)
-            uses = sum(1 for r in e.rows if canon(r.c2) == c)
-            extra = uses - 1
-            if c and extra > 0:
-                s.subtract(Counter(c * extra))
-                s = +s
-        assert not (s - d), "chars lost in %s: %s" % (i, dict(s - d))
-        assert not (d - s), "chars invented in %s: %s" % (i, dict(d - s))
+        z = zipfile.ZipFile(rec["path"])
+        chrome = Counter()
+        for part in z.namelist():
+            if re.match(r"word/(header|footer)\d*\.xml$", part):
+                chrome.update("".join(re.findall(r"<w:t[^>]*>([^<]*)</w:t>",
+                                                 z.read(part).decode())))
+        for c in _first_table(rec["path"]).rows[0].cells:
+            chrome.update(c.text)
+        for v in rec["model"].get("meta", {}).values():
+            chrome.update(v)
+        for v in rec["model"].get("columns", []):
+            chrome.update(v)
+
+        page_c = canon_c("".join(paras))
+        page_c.subtract(Counter({k: v for k, v in chrome.items() if k not in " \n"}))
+        page_c = +page_c
+
+        model_c = Counter()
+        for field in _model_text(rec):
+            model_c.update(canon_c(field))
+
+        assert not (page_c - model_c), "%s: page invented characters: %s" % (
+            i, dict(page_c - model_c))
 
 
 def test_all_rows_present(built):
@@ -279,8 +316,10 @@ def test_large_document_spans_pages(built):
     # the plan table must allow splitting on long cells...
     trs = [t for t in root.iter(W + "tbl")][-1].findall(W + "tr")
     nav = [r for r in rec["model"]["nav_rows"] if r["type"] == "nav"]
-    from pipeline.render import split_for_layout
-    visual_rows = sum(len(split_for_layout(r["value"])) for r in rec["model"]["content_rows"])
+    from pipeline import structure as S
+    visual_rows = sum(
+        len(S.pack_rows(S.segments(r["value"]), T.CHARS_PER_BODY_ROW))
+        for r in rec["model"]["content_rows"])
     assert len(trs) == 1 + len(nav) + visual_rows
     # ...and must keep its header row repeatable
     assert trs[0].find(W + "trPr").find(W + "tblHeader") is not None
@@ -496,6 +535,11 @@ def _all_text(ext):
     return out
 
 
+def _first_table(path):
+    from docx import Document
+    return Document(path).tables[0]
+
+
 def _page_cell_paras(path):
     from docx import Document
     d = Document(path)
@@ -600,6 +644,84 @@ def test_10_ellipses_are_the_author_s(built):
             t = norm(a.get("text", ""))
             if t.endswith("\u2026"):
                 assert t in page, "%s: truncated-looking bullet was altered: %r" % (i, t[-40:])
+
+
+def test_11_no_corrupt_glyphs(built):
+    """Every character must have a glyph in the document's own font."""
+    from fontTools.ttLib import TTFont
+    font = TTFont(os.path.join("templates", "assets", "NotoNaskhArabic-Regular.ttf"))
+    cmap = set()
+    for t in font["cmap"].tables:
+        cmap |= set(t.cmap.keys())
+    for i, rec in built.items():
+        chars = set("".join(_page_cell_paras(rec["path"]) + _page_paras(rec["path"])))
+        missing = [c for c in chars if ord(c) > 32 and ord(c) not in cmap]
+        assert not missing, "%s: font has no glyph for %r" % (i, missing[:8])
+
+
+def test_12_page_fields_are_valid(built):
+    """Cached PAGE/NUMPAGES must be real numbers and Word must refresh them."""
+    import re as _re
+    for i, rec in built.items():
+        z = zipfile.ZipFile(rec["path"])
+        cached = _re.findall(r"<w:t[^>]*>(\d+)</w:t>",
+                             z.read("word/footer1.xml").decode())
+        assert cached, "%s: page fields carry no cached result" % i
+        assert max(int(c) for c in cached) == rec["pages"], \
+            "%s: NUMPAGES cache %s != %d pages" % (i, cached, rec["pages"])
+        assert "updateFields" in z.read("word/settings.xml").decode(), \
+            "%s: Word is never told to refresh fields" % i
+
+
+def test_13_drawing_ids_are_unique(built):
+    """Duplicate docPr ids make Word drop pictures (the 'figure missing' bug)."""
+    import re as _re
+    for i, rec in built.items():
+        z = zipfile.ZipFile(rec["path"])
+        ids = []
+        for part in z.namelist():
+            if part.startswith("word/") and part.endswith(".xml"):
+                ids += _re.findall(r'<wp:docPr id="(\d+)"', z.read(part).decode())
+        assert ids, "%s: no drawing placed at all" % i
+        assert len(ids) == len(set(ids)), "%s: duplicate drawing ids %s" % (i, ids)
+
+
+def test_14_truncated_bullets_completed_from_source(built):
+    """No bullet may dangle on «…», and any completion must come from source."""
+    from pipeline import extract as EX
+    for i, rec in built.items():
+        src = EX.extract(rec["src"])
+        body = norm(" ".join("%s %s" % (r.c2, r.c3) for r in src.rows))
+        left = [a["text"] for a in rec["model"]["appendix"]
+                if a["text"].rstrip().endswith("\u2026")]
+        assert not left, "%s: %d bullet(s) still truncated: %r" % (i, len(left), left[:1])
+        for a in rec["model"]["appendix"]:
+            if a.get("completed_from_source"):
+                assert norm(a["text"])[-70:] in body, \
+                    "%s: completion not found in source: %r" % (i, a["text"][-50:])
+
+
+def test_15_headings_need_source_evidence(built):
+    """A row may be a heading only if the source marks it as one."""
+    from pipeline.clean import looks_like_heading
+    for i, rec in built.items():
+        for r in rec["model"]["content_rows"]:
+            if r.get("render") == "heading":
+                assert looks_like_heading(r["label"]), \
+                    "%s: heading without source evidence: %r" % (i, r["label"][:50])
+
+
+def test_16_source_figure_is_carried(built):
+    """A drawing in the source must be a drawing in the sample."""
+    from pipeline import extract as EX
+    for i, rec in built.items():
+        if not EX.extract(rec["src"]).media:
+            continue
+        z = zipfile.ZipFile(rec["path"])
+        assert [n for n in z.namelist() if n.startswith("word/media/")], \
+            "%s: source had an image, output has none" % i
+        assert "a:blip" in z.read("word/document.xml").decode(), \
+            "%s: image embedded but never referenced" % i
 
 
 def test_docx_is_valid_package(built):
