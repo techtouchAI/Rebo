@@ -141,6 +141,10 @@ def build_headers(section, model):
     for q in list(fp.paragraphs):
         q._p.getparent().remove(q._p)
     _pic_para(fp, os.path.join(ASSET_DIR, "banner.png"), text_w)
+    # the default (non-first) header must still exist: without it Word reuses
+    # the first-page banner and every continuation page loses its identity
+    if section.header.is_linked_to_previous:
+        section.header.is_linked_to_previous = False
 
 
 def build_footers(section, model):
@@ -413,6 +417,9 @@ def _fill_row(row, total, ri, *, label, paras, kind):
         # character audit, which is what caught it).
         blocks = [((label + " " + "\n".join(paras)).strip(), "p")]
         lab_blocks = []
+    elif kind == "plain":
+        blocks = [("\n".join([p for p in paras if p]), "p")]
+        lab_blocks = []
     else:
         # ONE source of truth per cell: the heading.  A label longer than the
         # column can hold is a sentence fragment in the source, so it is set as
@@ -446,7 +453,7 @@ def _write(blocks, cell, align="both"):
         if not item:
             continue
         text, kind = item
-        if not text:
+        if not (text or "").strip():
             continue
         head = kind == "h"
         for piece in text.split("\n"):
@@ -670,6 +677,43 @@ def _place_figure(doc, media, index):
 
 
 # --------------------------------------------------------------------------- #
+def para_indent_shim():          # pragma: no cover - documented in ooxml
+    return None
+
+
+def render_teaching(model, out_path, total_pages=None):
+    """
+    Build the TEACHING view: condensed axes + one generated plate per topic
+    that needs one.
+
+    Determinism and the page frame are identical to render(); only the body
+    differs.  `model['teaching']` is required (pipeline.didactic.condense).
+    """
+    _DRAW_ID[0] = 1000
+    doc = Document()
+    _rtl_defaults(doc)
+    section = setup_section(doc)
+    body = doc.element.body
+    for p in list(body.findall(qn("w:p"))):
+        body.remove(p)
+
+    build_headers(section, model)
+    section._rebo_pages = total_pages
+    build_footers(section, model)
+    build_meta_cards(doc, model)
+    build_teaching_table(doc, model, True)
+
+    cp = doc.core_properties
+    cp.title = model.get("title", "")
+    cp.subject = model.get("subject", "التربية الفنية")
+    cp.author = "techtouchAI / Rebo pipeline"
+    cp.comments = ("Generated deterministically from %s (teaching view)"
+                   % os.path.basename(model.get("source", "")))
+    enable_field_update(doc)
+    doc.save(out_path)
+    return out_path
+
+
 def render(model, out_path, total_pages=None):
     """
     Build the DOCX.
@@ -704,3 +748,275 @@ def render(model, out_path, total_pages=None):
     enable_field_update(doc)
     doc.save(out_path)
     return out_path
+
+
+# =========================================================================== #
+# TEACHING VIEW  --  the condensed, illustrated plan
+# =========================================================================== #
+# This renderer shares the page frame (banner, footer, columns, RTL) with the
+# verbatim one.  It differs only in WHAT it prints: the axis structure built by
+# pipeline.didactic, with a plate attached to the axes that need one.
+#
+# It never invents text: every string it writes comes from model['teaching'],
+# whose every string is a verbatim slice of the source.
+
+def _full_row(tbl, ncols, height=800, header=False, cant_split=False, span=None):
+    """One table row spanning every column (axis headings and plates)."""
+    row = tbl.add_row()
+    X.row_props(row, height=height, header=header, cant_split=cant_split)
+    cells = row.cells
+    merged = cells[0]
+    for c in cells[1:]:
+        merged = merged.merge(c)
+    if span:
+        X.grid_span(merged, span)
+    return merged
+
+
+def _plate_block(doc, tbl, image_path, caption, source_note, text_w):
+    """
+    A plate lives INSIDE the table, in a merged full-width row, immediately
+    after the axis it explains.  Keeping it in the same table is what stops it
+    from tearing away from its caption across a page break.
+    """
+    cell = _full_row(tbl, 4, height=T.FIGURE_ROW_MIN_TWIPS, span=4)
+    X.cell_shade(cell, T.C_PLATE_FILL)
+    X.cell_valign(cell, "top")
+    X.cell_margins(cell, 70, 85, 70, 85)
+    X.cell_borders(cell, top=("4", T.C_RULE), bottom=("4", T.C_RULE),
+                   left=("12", T.C_RULE), right=("12", T.C_RULE))
+
+    # caption first: it must never be separated from the artwork
+    p = cell.paragraphs[0]
+    X.para_props(p, rtl=True, align="right", space_before=0, space_after=40,
+                 line=260, keep_next=True)
+    X.add_text_run(p, caption, font=T.FONT_HEADING, size=T.SZ_LABEL + 1,
+                   bold=True, color=T.C_ACCENT_BLUE)
+
+    from PIL import Image as _Img
+    with _Img.open(image_path) as im:
+        pw, ph = im.size
+    aspect = pw / float(ph)
+    width_in = min(T.FIGURE_W_IN, T.FIGURE_MAX_H_IN * aspect)
+    height_in = width_in / aspect
+    pic = cell.add_paragraph()
+    X.para_props(pic, rtl=True, align="center", space_before=0,
+                 space_after=50, line=240, keep_next=True)
+    pic.add_run().add_picture(image_path, width=Inches(width_in),
+                              height=Inches(height_in))
+    for pr in pic._p.iter(qn("wp:docPr")):
+        pr.set("id", str(_next_id()))
+
+    note = cell.add_paragraph()
+    X.para_props(note, rtl=True, align="center", space_before=0,
+                 space_after=40, line=240)
+    X.add_text_run(note, source_note, font=T.FONT_BODY, size=T.SZ_FOOTER + 1,
+                   color=T.C_MUTED)
+    _reid(cell)
+    return cell
+
+
+def _axis_rows(doc, tbl, axes, attachments, text_w):
+    """
+    One design-shaped row per axis.
+
+    Columns follow the reference artwork exactly: the axis title sits in the
+    الموضوع column, the condensed body in the wide content column.  Only the
+    structural blocks the design has no counterpart for — part bands and
+    plates — span the full width.
+    """
+    for a in axes:
+        row = tbl.add_row()
+        X.row_props(row, height=T.ROW_MIN_H_TWIPS, cant_split=False)
+        _fill_row(row, len(row.cells), 0, label=a["title"] or "",
+                  paras=["\n".join(b["text"] for b in a["blocks"]
+                                    if b["kind"] == "para")],
+                  kind="heading" if a["title"] else "plain")
+        # bullets are emitted separately so they never merge into the prose
+        bullets = [b["text"] for b in a["blocks"] if b["kind"] == "bullet"]
+        if bullets:
+            cell = row.cells[3]
+            for b in bullets:
+                p = cell.add_paragraph()
+                X.para_props(p, rtl=True, align="both", space_before=0,
+                             space_after=80, line=290)
+                X.para_indent(p, start=240)
+                X.add_text_run(p, "\u25aa ", font=T.FONT_BODY,
+                               size=T.SZ_BODY, color=T.C_ACCENT_BLUE)
+                X.add_text_run(p, b, font=T.FONT_BODY, size=T.SZ_BODY,
+                               color=T.C_TEXT)
+        for att in attachments.get(a["n"], []):
+            _plate_block(doc, tbl, att["path"], att["caption"],
+                         T.PLATE_NOTE, text_w)
+
+
+def _ar_num(n):
+    """Axis number in Arabic-Indic digits, as the source writes them."""
+    return "".join("٠١٢٣٤٥٦٧٨٩"[int(d)] for d in str(n)) + "."
+
+
+def build_teaching_table(doc, model, planning):
+    """The condensed plan: sections, axes, paragraphs, bullets and plates."""
+    t = model["teaching"]
+    atts = model.get("_attachments", {})
+    text_w = T.TEXT_W_TWIPS
+
+    tbl = doc.add_table(rows=1, cols=4)
+    X.tbl_pr_ordered(tbl, text_w)
+    tbl.autofit = False
+    X.table_set_grid(tbl, T.col_widths())
+
+    hdr = tbl.rows[0]
+    X.row_props(hdr, height=T.ROW_MIN_H_TWIPS, header=True, cant_split=True)
+    for i, cell in enumerate(hdr.cells):
+        X.cell_shade(cell, T.C_HEAD_FILL)
+        X.cell_valign(cell, "center")
+        _cell_frame(cell, pad=57, sz="16")
+        p = cell.paragraphs[0]
+        X.para_props(p, rtl=True, align="center", space_before=20,
+                     space_after=20, line=250)
+        X.add_text_run(p, T.COL_TITLES[i], font=T.FONT_HEADING,
+                       size=T.SZ_HEADER, bold=True, color=T.C_HEAD_TEXT)
+
+    # remove the pre-created empty rows; every row below is added explicitly so
+    # the count can never drift from the content
+    for r in list(tbl.rows[1:]):
+        r._tr.getparent().remove(r._tr)
+
+    cards = {r["type"]: r["value"] for r in model.get("nav_rows", [])
+             if r["type"] in ("guide_pages", "lesson_identity")}
+    lesson_txt, info_txt = _split_identity(cards)
+    if len(tbl.rows) < 3:
+        for _ in range(3 - len(tbl.rows)):
+            tbl.add_row()
+    _merge_column(tbl, 0, lesson_txt)
+    _merge_column(tbl, 1, info_txt)
+    for extra in list(tbl.rows[3:]):
+        pass
+
+    for s in t["sections"]:
+        if s.get("title"):
+            cell = _full_row(tbl, 4, height=T.SECTION_MIN_TWIPS,
+                             cant_split=True, span=4)
+            X.cell_shade(cell, T.C_SECTION_FILL)
+            X.cell_valign(cell, "center")
+            X.cell_margins(cell, 80, 85, 80, 85)
+            X.cell_borders(cell, top=("8", T.C_RULE), bottom=("8", T.C_RULE),
+                           left=("12", T.C_RULE), right=("12", T.C_RULE))
+            p = cell.paragraphs[0]
+            X.para_props(p, rtl=True, align="center", space_before=0,
+                         space_after=0, line=260, keep_next=True)
+            X.add_text_run(p, s["title"], font=T.FONT_HEADING,
+                           size=T.SZ_SECTION, bold=True, color=T.C_BANNER_NAVY)
+        _axis_rows(doc, tbl, s["axes"], atts, text_w)
+
+    # ---- assessment: the source's own questions, closed against the content
+    _assessment_rows(tbl, model)
+    return tbl
+
+
+def _assessment_rows(tbl, model):
+    """
+    Print the source's assessment block above the answer key.
+
+    The questions are the author's, verbatim.  `model['_quiz_check']` carries
+    the proof that each keyed answer is still taught in this very plan.
+    """
+    q = model.get("_quiz") or {}
+    if not q:
+        return
+
+    def band(text, fill, size):
+        cell = _full_row(tbl, 4, height=T.SECTION_MIN_TWIPS, cant_split=True,
+                         span=4)
+        X.cell_shade(cell, fill)
+        X.cell_valign(cell, "center")
+        X.cell_margins(cell, 70, 85, 70, 85)
+        X.cell_borders(cell, top=("8", T.C_RULE), bottom=("8", T.C_RULE),
+                       left=("12", T.C_RULE), right=("12", T.C_RULE))
+        p = cell.paragraphs[0]
+        X.para_props(p, rtl=True, align="right", space_before=0,
+                     space_after=0, line=260, keep_next=True)
+        X.add_text_run(p, text, font=T.FONT_HEADING, size=size, bold=True,
+                       color=T.C_HEAD_TEXT)
+        return cell
+
+    if q.get("mc") or q.get("tf"):
+        band("أسئلة التقويم", T.C_SECTION_FILL, T.SZ_SECTION)
+    for item in q.get("mc", []):
+        cell = _full_row(tbl, 4, cant_split=True, span=4)
+        X.cell_shade(cell, T.C_CELL)
+        X.cell_margins(cell, 60, 85, 60, 85)
+        X.cell_borders(cell, top=("4", T.C_RULE), bottom=("4", T.C_RULE),
+                       left=("12", T.C_RULE), right=("12", T.C_RULE))
+        first = True
+        X.para_props(cell.paragraphs[0], rtl=True, align="both",
+                     space_before=0, space_after=40, line=280)
+        X.add_text_run(cell.paragraphs[0],
+                       "%s %s" % (_ar_num(item["n"]), item["stem"]),
+                       font=T.FONT_BODY, size=T.SZ_BODY, bold=True,
+                       color=T.C_TEXT)
+        first = False
+        for letter, opt in item["options"]:
+            p = cell.add_paragraph()
+            X.para_props(p, rtl=True, align="both", space_before=0,
+                         space_after=20, line=280)
+            X.para_indent(p, start=240)
+            X.add_text_run(p, "%s) %s" % (letter, opt), font=T.FONT_BODY,
+                           size=T.SZ_BODY - 1, color=T.C_TEXT)
+    for item in q.get("tf", []):
+        cell = _full_row(tbl, 4, cant_split=True, span=4)
+        X.cell_shade(cell, T.C_CELL)
+        X.cell_margins(cell, 50, 85, 50, 85)
+        X.cell_borders(cell, top=("4", T.C_RULE), bottom=("4", T.C_RULE),
+                       left=("12", T.C_RULE), right=("12", T.C_RULE))
+        p = cell.paragraphs[0]
+        X.para_props(p, rtl=True, align="both", space_before=0,
+                     space_after=20, line=280)
+        X.add_text_run(p, item["text"], font=T.FONT_BODY, size=T.SZ_BODY,
+                       color=T.C_TEXT)
+
+    for item in q.get("generated", []):
+        cell = _full_row(tbl, 4, cant_split=True, span=4)
+        X.cell_shade(cell, T.C_CELL)
+        X.cell_margins(cell, 50, 85, 50, 85)
+        X.cell_borders(cell, top=("4", T.C_RULE), bottom=("4", T.C_RULE),
+                       left=("12", T.C_RULE), right=("12", T.C_RULE))
+        p = cell.paragraphs[0]
+        X.para_props(p, rtl=True, align="both", space_before=0,
+                     space_after=20, line=280)
+        X.add_text_run(p, item["prompt"], font=T.FONT_BODY,
+                       size=T.SZ_BODY, bold=True, color=T.C_TEXT)
+        p = cell.add_paragraph()
+        X.para_props(p, rtl=True, align="both", space_before=0,
+                     space_after=10, line=270)
+        X.add_text_run(p, "المصدر: " + item["answer"][:180],
+                       font=T.FONT_BODY, size=T.SZ_FOOTER + 1,
+                       color=T.C_MUTED)
+
+    key = q.get("key") or {}
+    if key:
+        cell = _full_row(tbl, 4, cant_split=True, span=4)
+        X.cell_shade(cell, T.C_LABEL_FILL)
+        X.cell_margins(cell, 60, 85, 60, 85)
+        X.cell_borders(cell, top=("4", T.C_RULE), bottom=("4", T.C_RULE),
+                       left=("12", T.C_RULE), right=("12", T.C_RULE))
+        p = cell.paragraphs[0]
+        X.para_props(p, rtl=True, align="right", space_before=0,
+                     space_after=30, line=260, keep_next=True)
+        X.add_text_run(p, "مفتاح الإجابة للمعلم", font=T.FONT_HEADING,
+                       size=T.SZ_AXIS, bold=True, color=T.C_HEAD_TEXT)
+        for kind, label in (("mc", "الاختيار من متعدد"), ("tf", "الصح والخطأ")):
+            if not key.get(kind):
+                continue
+            bits = []
+            for n in sorted(key[kind]):
+                v = key[kind][n]
+                v = "صح" if v == "ص" and kind == "mc" else v
+                bits.append("%s ـ %s" % (_ar_num(n).rstrip("."), v))
+            p = cell.add_paragraph()
+            X.para_props(p, rtl=True, align="right", space_before=0,
+                         space_after=20, line=270)
+            X.add_text_run(p, "%s: %s" % (label, "، ".join(bits)),
+                           font=T.FONT_BODY, size=T.SZ_BODY - 1,
+                           color=T.C_TEXT)

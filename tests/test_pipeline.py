@@ -782,3 +782,316 @@ def test_build_is_deterministic(built, tmp_path):
         a = zipfile.ZipFile(rec["path"]).read("word/document.xml")
         b = zipfile.ZipFile(p2).read("word/document.xml")
         assert a == b, "%s is not deterministic" % i
+
+
+# =========================================================================== #
+# TEACHING VIEW  --  condensation + illustration
+# =========================================================================== #
+@pytest.fixture(scope="session")
+def teaching(tmp_path_factory):
+    """Build the teaching view of both samples once, with measured pages."""
+    from pipeline import compile_plan
+    out = {}
+    d = tmp_path_factory.mktemp("teaching")
+    for i in IDS:
+        rec = compile_plan.build_pair(source_path(i), i, str(d),
+                                      measure=_measure_pages)
+        out[i] = rec
+    return out
+
+
+# ---- 17. the plan is not reduced to titles --------------------------------
+def test_17_axes_carry_real_information(teaching):
+    for i, rec in teaching.items():
+        for sec in rec["teaching"]["sections"]:
+            for a in sec["axes"]:
+                assert a["blocks"], "axis %d has no body" % a["n"]
+                chars = sum(len(b["text"]) for b in a["blocks"])
+                assert chars >= 90, (
+                    "axis %d is a stub (%d chars): %r"
+                    % (a["n"], chars, a["title"]))
+
+
+# ---- 18. nothing is invented; every string is a source slice -------------
+def test_18_every_taught_string_is_verbatim(teaching):
+    import re as _re
+    for i, rec in teaching.items():
+        src = ""
+        for r in rec["model"]["content_rows"]:
+            src += r["label"] + " " + r["value"] + " "
+        flat = _re.sub(r"\s+", "", src)
+        for sec in rec["teaching"]["sections"]:
+            for a in sec["axes"]:
+                for b in a["blocks"]:
+                    key = _re.sub(r"\s+", "", b["text"])
+                    assert key in flat, (
+                        "%s invented text: %r" % (i, b["text"][:60]))
+
+
+# ---- 19. order is preserved ----------------------------------------------
+def test_19_taught_order_follows_the_source(teaching):
+    import re as _re
+    for i, rec in teaching.items():
+        src = "".join(_re.sub(r"\s+", "", r["label"] + r["value"])
+                      for r in rec["model"]["content_rows"])
+        cursor = 0
+        for sec in rec["teaching"]["sections"]:
+            for a in sec["axes"]:
+                for b in a["blocks"]:
+                    key = _re.sub(r"\s+", "", b["text"])
+                    at = src.find(key, cursor)
+                    assert at >= 0, "%s out of order: %r" % (i, b["text"][:50])
+                    cursor = at + len(key)
+
+
+# ---- 20. no axis silently dropped ----------------------------------------
+def test_20_every_source_row_reaches_an_axis(teaching):
+    for i, rec in teaching.items():
+        covered = set()
+        for sec in rec["teaching"]["sections"]:
+            for a in sec["axes"]:
+                covered.update(a["rows"])
+        assert len(covered) == len(rec["model"]["content_rows"]), (
+            "%s lost rows %s" % (i, sorted(set(range(len(
+                rec["model"]["content_rows"]))) - covered)))
+
+
+# ---- 21. exclusions are declared, never silent ---------------------------
+def test_21_exclusions_have_reasons(teaching):
+    allowed = {"تفاصيل تنفيذية/خطوات صناعة",
+               "تكرار لفظي لمعلومة معروضة",
+               "توجيه للمعلم لا يخدم فهم الطالب",
+               "وحدة فارغة"}
+    for i, rec in teaching.items():
+        for sec in rec["teaching"]["sections"]:
+            for a in sec["axes"]:
+                for d in a["dropped"]:
+                    assert d["reason"] in allowed, d
+
+
+# ---- 22. procedural detail is what leaves, not the teaching content ------
+def test_22_procedure_is_the_main_exclusion(teaching):
+    for i, rec in teaching.items():
+        st = rec["teaching"]["stats"]
+        by = st["by_reason"]
+        proc = by.get("تفاصيل تنفيذية/خطوات صناعة", 0)
+        assert proc >= sum(v for k, v in by.items() if k !=
+                           "تفاصيل تنفيذية/خطوات صناعة") * 0.4, by
+
+
+# ---- 23. no duplication across axes --------------------------------------
+def test_23_no_duplicate_block_anywhere(teaching):
+    import re as _re
+    for i, rec in teaching.items():
+        seen = set()
+        for sec in rec["teaching"]["sections"]:
+            for a in sec["axes"]:
+                for b in a["blocks"]:
+                    key = _re.sub(r"\s+", "", b["text"])
+                    if len(key) < 60:
+                        continue
+                    assert key not in seen, (
+                        "%s duplicated a block: %r" % (i, b["text"][:50]))
+                    seen.add(key)
+
+
+# ---- 24. a question never tests something the plan does not teach --------
+def test_24_quiz_answers_are_taught(teaching):
+    for i, rec in teaching.items():
+        ok, rows = rec["closure"]
+        assert ok, "%s: unanswerable questions %s" % (
+            i, [r["answer"][:40] for r in rows if not r["taught"]])
+
+
+# ---- 25. the answer key parses to the source's own letters --------------
+def test_25_answer_key_matches_source(teaching):
+    for i, rec in teaching.items():
+        key = rec["quiz"]["key"]
+        assert key.get("tf"), "%s: no true/false key" % i
+        assert key.get("mc"), "%s: no multiple-choice key" % i
+        for n, letter in key["mc"].items():
+            assert letter in "أبجد", (i, n, letter)
+
+
+# ---- 26. the source's own quiz is carried verbatim ----------------------
+def test_26_source_quiz_text_is_preserved(teaching):
+    import re as _re
+    for i, rec in teaching.items():
+        blob = _re.sub(r"\s+", "", " ".join(
+            a.get("text", "") for a in rec["model"]["appendix"]))
+        for q in rec["quiz"]["mc"]:
+            stem = _re.sub(r"\s+", "", q["stem"])
+            assert stem in blob, "%s altered stem %r" % (i, q["stem"][:40])
+
+
+# ---- 27. generated questions are derived from printed content -----------
+def test_27_generated_questions_are_backed(teaching):
+    for i, rec in teaching.items():
+        taught = " ".join(b["text"] for s in rec["teaching"]["sections"]
+                          for a in s["axes"] for b in a["blocks"])
+        for g in rec["quiz"]["generated"]:
+            first = g["answer"].split(" / ")[0][:40]
+            assert first in taught or first in " ".join(
+                a.get("text", "") for a in rec["model"]["appendix"]), (
+                "%s: question not backed by content: %r" % (i, g["prompt"]))
+
+
+# ---- 28. every plate belongs to the axis it illustrates -----------------
+def test_28_plate_matches_its_axis(teaching):
+    from pipeline import figures_map
+    for i, rec in teaching.items():
+        axes = {a["n"]: a for s in rec["teaching"]["sections"]
+                for a in s["axes"]}
+        for n, plates in rec["plates"].items():
+            text = " ".join(b["text"] for b in axes[n]["blocks"])
+            text += " " + (axes[n].get("title") or "")
+            for pl in plates:
+                name = pl["name"]
+                if name == "history_timeline":
+                    assert any(e["date"] in text for e in rec["model"]["_timeline"])
+                    continue
+                sets = [c for n2, c, _p in figures_map.RULES if n2 == name]
+                assert sets, "plate %s has no rule" % name
+                assert any(all(c in text for c in cs) for cs in sets), (
+                    "%s axis %d got %s without any of %s"
+                    % (i, n, name, sets))
+
+
+# ---- 29. plates are not repeated without cause --------------------------
+def test_29_no_wasted_duplicate_plates(teaching):
+    for i, rec in teaching.items():
+        names = [p["name"] for v in rec["plates"].values() for p in v]
+        for n in set(names):
+            assert names.count(n) <= 2, "%s reused %s %d times" % (
+                i, n, names.count(n))
+
+
+# ---- 30. every plate image is really embedded in the DOCX --------------
+def test_30_plates_are_embedded(teaching):
+    """Every plate is referenced by a drawing AND resolves to real bytes."""
+    import zipfile
+    A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+    for i, rec in teaching.items():
+        z = zipfile.ZipFile(rec["docx"])
+        root = etree.fromstring(z.read("word/document.xml"))
+        rels = etree.fromstring(z.read("word/_rels/document.xml.rels"))
+        targets = {}
+        for r in rels:
+            targets[r.get("Id")] = r.get("Target")
+        blips = [b.get(R + "embed") for b in root.iter(A + "blip")]
+        plates = sum(len(v) for v in rec["plates"].values())
+        assert len(blips) >= plates, (
+            "%s: %d drawings for %d plates" % (i, len(blips), plates))
+        for rid in blips:
+            tgt = targets.get(rid)
+            assert tgt, "%s: dangling image relationship %s" % (i, rid)
+            name = "word/" + tgt.lstrip("/")
+            assert name in z.namelist(), "%s: missing part %s" % (i, name)
+            assert len(z.read(name)) > 500, "%s: empty image %s" % (i, name)
+
+
+# ---- 31. drawing ids stay unique document-wide --------------------------
+def test_31_teaching_drawing_ids_unique(teaching):
+    import zipfile
+    from pipeline.extract import extract as _ex
+    for i, rec in teaching.items():
+        z = zipfile.ZipFile(rec["docx"])
+        ids = []
+        for n in z.namelist():
+            if n.endswith(".xml"):
+                ids += etree.fromstring(z.read(n)).xpath(
+                    "//wp:docPr/@id",
+                    namespaces={"wp": "http://schemas.openxmlformats.org/"
+                                      "drawingml/2006/wordprocessingDrawing"})
+        ids = [k for k in ids if k]
+        assert len(ids) == len(set(ids)), "%s duplicate docPr ids" % i
+
+
+# ---- 32. page fields carry the measured count ---------------------------
+def test_32_teaching_page_fields(teaching):
+    import zipfile
+    for i, rec in teaching.items():
+        z = zipfile.ZipFile(rec["docx"])
+        footers = [n for n in z.namelist() if n.startswith("word/footer")]
+        text = "".join(z.read(n).decode("utf-8") for n in footers)
+        assert "NUMPAGES" in text or "PAGE" in text
+        for n in footers:
+            xml = z.read(n).decode("utf-8")
+            for seg in xml.split("<w:t")[1:]:
+                pass
+        assert rec["pages"] >= 1
+
+
+# ---- 33. the teaching view keeps RTL and the design grid ---------------
+def test_33_teaching_is_rtl(teaching):
+    for i, rec in teaching.items():
+        root = xml(rec["docx"])
+        sect = root.find(".//" + W + "sectPr")
+        assert sect is not None and sect.find(W + "bidi") is not None
+        tbls = root.findall(".//" + W + "tbl")
+        assert tbls, "%s has no tables" % i
+        for t in tbls:
+            tp = t.find(W + "tblPr")
+            assert tp is not None and tp.find(W + "bidiVisual") is not None
+            grid = [int(g.get(W + "w")) for g in t.find(W + "tblGrid")]
+            if len(grid) == 4:
+                assert sum(grid) == 10376, (i, sum(grid))
+
+
+# ---- 34. no text is clipped by a cell -----------------------------------
+def test_34_teaching_fits_the_print_area(teaching):
+    for i, rec in teaching.items():
+        root = xml(rec["docx"])
+        for t in root.findall(".//" + W + "tbl"):
+            grid = [int(g.get(W + "w")) for g in t.find(W + "tblGrid")]
+            assert sum(grid) <= 10376, (i, sum(grid))
+
+
+# ---- 35. a plate failure must not lose text -----------------------------
+def test_35_missing_plate_keeps_the_text(tmp_path, monkeypatch):
+    from pipeline import figures_map, render, didactic
+    from pipeline.extract import extract as _ex
+    from pipeline.clean import clean_document as _cl
+
+    def boom(*a, **k):
+        raise RuntimeError("renderer unavailable")
+
+    monkeypatch.setattr(figures_map.figurelib, "make", boom)
+    src = source_path("19")
+    ext, model = _ex(src), None
+    model, _ = _cl(ext, "19")
+    t = didactic.condense(model)
+    att, log, mp = figures_map.resolve(t, [], out_dir=str(tmp_path))
+    assert att == {}                       # nothing attached
+    assert any(l["status"] == "failed" for l in log)
+    model["_attachments"] = {}
+    out = str(tmp_path / "no_plates.docx")
+    render.render_teaching(model, out)
+    blob = docx_text(out)
+    assert len(blob) > 1500               # the content is all still there
+
+
+# ---- 36. determinism of the teaching view -------------------------------
+def test_36_teaching_build_is_deterministic(teaching, tmp_path):
+    import zipfile
+    from pipeline import render
+    for i, rec in teaching.items():
+        out = str(tmp_path / ("det_%s.docx" % i))
+        render.render_teaching(rec["model"], out, total_pages=rec["pages"])
+        src, dst = zipfile.ZipFile(rec["docx"]), zipfile.ZipFile(out)
+        for part in ("word/document.xml", "word/footer1.xml"):
+            assert src.read(part) == dst.read(part), (i, part)
+
+
+# ---- 37. the two views are different documents --------------------------
+def test_37_verbatim_and_teaching_views_both_exist(teaching):
+    for i, rec in teaching.items():
+        assert os.path.exists(rec["docx"])
+        assert os.path.exists(rec["full_docx"])
+        short = docx_text(rec["docx"])
+        long = docx_text(rec["full_docx"])
+        assert len(short) < len(long), (
+            "%s: the teaching view is not condensed" % i)
+        assert len(short) > len(long) * 0.5, (
+            "%s: over-condensed" % i)

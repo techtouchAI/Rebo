@@ -354,3 +354,30 @@ def row_props(row, *, height=None, exact=False, header=False, cant_split=True):
 def row_is_header(row):
     trPr = row._tr.find(qn("w:trPr"))
     return trPr is not None and trPr.find(qn("w:tblHeader")) is not None
+
+
+def para_indent(paragraph, start=0, end=0, first=0):
+    """w:ind with SPECIFIC names (start/end) so RTL hanging bullets work."""
+    pPr = paragraph._p.find(qn("w:pPr"))
+    if pPr is None:
+        return
+    old = pPr.find(qn("w:ind"))
+    if old is not None:
+        pPr.remove(old)
+    ind = el("w:ind")
+    ind.set(qn("w:start"), str(start))
+    ind.set(qn("w:end"), str(end))
+    if first:
+        ind.set(qn("w:firstLine"), str(first))
+    pPr.append(ind)
+
+
+def grid_span(cell, span):
+    """Mark a merged cell's width, so previewers that ignore w:gridSpan still
+    lay the row out correctly (python-docx merges do not record this itself)."""
+    tcPr = cell._tc.get_or_add_tcPr()
+    old = tcPr.find(qn("w:gridSpan"))
+    if old is not None:
+        tcPr.remove(old)
+    gs = el("w:gridSpan", val=str(int(span)))
+    tcPr.insert(0, gs)

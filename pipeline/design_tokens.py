@@ -106,3 +106,27 @@ LABEL_COL_MAX_CHARS = 45
 CHARS_PER_BODY_ROW = 1150
 TITLE_TEXT = "الخطة الأسبوعية لمادة التربية الفنية"
 FOOTER_PREFIX = "التربية الفنية"
+
+
+# --------------------------------------------------------------------------- #
+# TEACHING VIEW (condensed + illustrated plan)
+# --------------------------------------------------------------------------- #
+# The teaching view is generated, not copied, so no reference measurement exists
+# for it.  These are derived the same way the rest of this file is: from the
+# content column (5547tw), the body size (10pt) and the A4 print area.
+C_PLATE_FILL = "F7FAFE"      # figure wells read as a quiet, recessed panel
+C_AXIS_FILL = "E8F0FB"       # axis heading band
+C_SECTION_FILL = "D5E5FA"    # part heading band (ثانياً / ثالثاً ...)
+C_MUTED = "5A6B85"           # source/ekphrasis note under a plate
+C_BANNER_NAVY = "001951"
+
+SZ_AXIS = 23                 # axis heading, 11.5pt: one step over the body
+SZ_SECTION = 26              # part heading, 13pt
+
+# A plate is a full-width row: 10376tw minus the cell padding = 10206tw of art.
+FIGURE_W_IN = 6.9            # 7.09in available inside the merged row
+FIGURE_MAX_H_IN = 3.05       # a portrait-heavy plate still keeps its caption
+FIGURE_ROW_MIN_TWIPS = 1400
+SECTION_MIN_TWIPS = 760
+PLATE_NOTE = ("رسم تعليمي مولّد لشرح الموضوع — ليس عملاً فنياً تاريخياً "
+              "ولا يُنسب إلى فنان.")

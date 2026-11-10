@@ -558,16 +558,27 @@ class Preview:
             self._table_open = True
             cells = tr.findall(W + "tc")
             info = []
-            for ci, tc in enumerate(cells):
-                if ci >= len(widths):
+            col = 0
+            for tc in cells:
+                if col >= len(widths):
                     break
                 tcPr = tc.find(W + "tcPr")
+                span = 1
+                if tcPr is not None:
+                    gs = tcPr.find(W + "gridSpan")
+                    if gs is not None:
+                        try:
+                            span = int(gs.get(W + "val"))
+                        except (TypeError, ValueError):
+                            span = 1
+                cwd = sum(widths[col:col + span])
                 vm = tcPr.find(W + "vMerge") if tcPr is not None else None
                 ops = [] if (vm is not None and vm.get(W + "val") != "restart") \
-                    else self.cell_ops(tc, widths[ci])
-                info.append(dict(ci=ci, tc=tc, ops=ops,
+                    else self.cell_ops(tc, cwd)
+                info.append(dict(ci=col, span=span, width=cwd, tc=tc, ops=ops,
                                  cont=(vm is not None and vm.get(W + "val") != "restart"),
                                  idx=0, used=0.0))
+                col += span
             need = max([sum(self.op_h(o) for o in cel["ops"]) for cel in info] or [0]) + 8
             h = max(need, min_height(tr))
             cant_split = False
@@ -598,7 +609,7 @@ class Preview:
                     ci = cel["ci"]
                     if ci >= len(xs) or cel["cont"]:
                         continue
-                    cw = widths[ci]
+                    cw = cel.get("width") or widths[ci]
                     tcp = cel["tc"].find(W + "tcPr")
                     if tcp is not None:
                         shd = tcp.find(W + "shd")
@@ -618,6 +629,24 @@ class Preview:
                         if spent + oh > budget:
                             break
                         op = ops[i]
+                        if op[0] == "img":
+                            _k, rid, w_pt, h_pt = op
+                            tgt = (self._doc_rels or {}).get(rid)
+                            data = self.img_bytes(tgt) if tgt else None
+                            if data:
+                                iw = min(w_pt, cw - 8)
+                                ih = h_pt * (iw / w_pt) if w_pt else h_pt
+                                c.drawImage(
+                                    ImageReader(io.BytesIO(data)),
+                                    xs[ci] + (cw - iw) / 2.0, ty - ih,
+                                    width=iw, height=ih,
+                                    preserveAspectRatio=True, anchor="n",
+                                    mask="auto")
+                                ty -= ih + 6
+                                oh = ih + 6
+                            spent += oh
+                            i += 1
+                            continue
                         if op[0] == "line":
                             _k, ln, size, bold, colour, align = op
                             font = self.fonts["bold" if bold else "regular"]
