@@ -127,7 +127,6 @@ def build_headers(section, model):
                     a grey rule, which is exactly the defect this replaces.  The
                     slim band costs ~11mm, not the 25mm of the full banner.
     """
-    section.different_first_page_header_footer = True
     text_w = T.TEXT_W_TWIPS / 1440
 
     hdr = section.header
@@ -152,7 +151,6 @@ def build_footers(section, model):
     The wave footer sits on every page, page 1 included, so the frame closes
     consistently.  The page number line rides underneath it.
     """
-    section.different_first_page_header_footer = True
     text_w = T.TEXT_W_TWIPS / 1440
     wave = os.path.join(ASSET_DIR, "footer_wave.png")
 
@@ -816,6 +814,33 @@ def _plate_block(doc, tbl, image_path, caption, source_note, text_w):
     return cell
 
 
+def _split_display(text, limit):
+    """
+    Split a block into display rows, ONLY at the author's own sentence ends.
+
+    This is a display change, never a text change: the pieces concatenate back
+    to the original string.  It exists because a single table row that is
+    taller than the page cannot be laid out by Word at all, and nothing may be
+    dropped to make it fit.
+    """
+    text = text or ""
+    if len(text) <= limit:
+        return [text]
+    out, buf = [], ""
+    for ch in text:
+        buf += ch
+        if ch in ".\u2026\n" and len(buf) >= limit:
+            out.append(buf)
+            buf = ""
+    if buf:
+        if out and len(buf) < 60:
+            out[-1] += buf
+        else:
+            out.append(buf)
+    assert "".join(out) == text, "display split altered the text"
+    return out
+
+
 def _axis_rows(doc, tbl, axes, attachments, text_w):
     """
     One design-shaped row per axis.
@@ -827,11 +852,20 @@ def _axis_rows(doc, tbl, axes, attachments, text_w):
     """
     for a in axes:
         row = tbl.add_row()
+        # cantSplit = False: a row taller than a page MUST be allowed to break,
+        # otherwise Word (and any faithful previewer) drops its remainder.
         X.row_props(row, height=T.ROW_MIN_H_TWIPS, cant_split=False)
-        _fill_row(row, len(row.cells), 0, label=a["title"] or "",
-                  paras=["\n".join(b["text"] for b in a["blocks"]
-                                    if b["kind"] == "para")],
-                  kind="heading" if a["title"] else "plain")
+        body = "\n".join(b["text"] for b in a["blocks"]
+                          if b["kind"] == "para")
+        pieces = _split_display(body, T.ROW_TEXT_LIMIT)
+        if a["title"]:
+            # _fill_row prints the label itself as the heading, so the title
+            # must NOT also appear in `paras` (it would print three times)
+            _fill_row(row, len(row.cells), 0, label=a["title"],
+                      paras=pieces, kind="heading")
+        else:
+            _fill_row(row, len(row.cells), 0, label="",
+                      paras=pieces, kind="plain")
         # bullets are emitted separately so they never merge into the prose
         bullets = [b["text"] for b in a["blocks"] if b["kind"] == "bullet"]
         if bullets:
@@ -886,9 +920,8 @@ def build_teaching_table(doc, model, planning):
     cards = {r["type"]: r["value"] for r in model.get("nav_rows", [])
              if r["type"] in ("guide_pages", "lesson_identity")}
     lesson_txt, info_txt = _split_identity(cards)
-    if len(tbl.rows) < 3:
-        for _ in range(3 - len(tbl.rows)):
-            tbl.add_row()
+    while len(tbl.rows) < 3:               # header + the design's three rows
+        tbl.add_row()
     _merge_column(tbl, 0, lesson_txt)
     _merge_column(tbl, 1, info_txt)
     for extra in list(tbl.rows[3:]):
@@ -917,96 +950,73 @@ def build_teaching_table(doc, model, planning):
 
 def _assessment_rows(tbl, model):
     """
-    Print the source's assessment block above the answer key.
+    Print the source's assessment block, then its answer key, as ONE row.
 
-    The questions are the author's, verbatim.  `model['_quiz_check']` carries
-    the proof that each keyed answer is still taught in this very plan.
+    A single row is what keeps a question and its key from being torn apart by
+    a page break: the block flows continuously and the key always follows the
+    questions it answers.
     """
     q = model.get("_quiz") or {}
     if not q:
         return
+    if not (q.get("mc") or q.get("tf")):
+        return
 
-    def band(text, fill, size):
-        cell = _full_row(tbl, 4, height=T.SECTION_MIN_TWIPS, cant_split=True,
-                         span=4)
-        X.cell_shade(cell, fill)
-        X.cell_valign(cell, "center")
-        X.cell_margins(cell, 70, 85, 70, 85)
-        X.cell_borders(cell, top=("8", T.C_RULE), bottom=("8", T.C_RULE),
-                       left=("12", T.C_RULE), right=("12", T.C_RULE))
-        p = cell.paragraphs[0]
-        X.para_props(p, rtl=True, align="right", space_before=0,
-                     space_after=0, line=260, keep_next=True)
-        X.add_text_run(p, text, font=T.FONT_HEADING, size=size, bold=True,
-                       color=T.C_HEAD_TEXT)
-        return cell
+    cell = _full_row(tbl, 4, cant_split=False, span=4)
+    X.cell_shade(cell, T.C_CELL)
+    X.cell_valign(cell, "top")
+    X.cell_margins(cell, 70, 85, 70, 85)
+    X.cell_borders(cell, top=("8", T.C_RULE), bottom=("8", T.C_RULE),
+                   left=("12", T.C_RULE), right=("12", T.C_RULE))
 
-    if q.get("mc") or q.get("tf"):
-        band("أسئلة التقويم", T.C_SECTION_FILL, T.SZ_SECTION)
+    first = True
+
+    def para(align="both", after=30, before=0):
+        nonlocal first
+        p = cell.paragraphs[0] if first else cell.add_paragraph()
+        first = False
+        X.para_props(p, rtl=True, align=align, space_before=before,
+                     space_after=after, line=280)
+        return p
+
+    p = para("right", after=50)
+    X.add_text_run(p, "أسئلة التقويم", font=T.FONT_HEADING,
+                   size=T.SZ_SECTION, bold=True, color=T.C_HEAD_TEXT)
+
     for item in q.get("mc", []):
-        cell = _full_row(tbl, 4, cant_split=True, span=4)
-        X.cell_shade(cell, T.C_CELL)
-        X.cell_margins(cell, 60, 85, 60, 85)
-        X.cell_borders(cell, top=("4", T.C_RULE), bottom=("4", T.C_RULE),
-                       left=("12", T.C_RULE), right=("12", T.C_RULE))
-        first = True
-        X.para_props(cell.paragraphs[0], rtl=True, align="both",
-                     space_before=0, space_after=40, line=280)
-        X.add_text_run(cell.paragraphs[0],
-                       "%s %s" % (_ar_num(item["n"]), item["stem"]),
+        p = para(after=10, before=60)
+        X.add_text_run(p, "%s %s" % (_ar_num(item["n"]), item["stem"]),
                        font=T.FONT_BODY, size=T.SZ_BODY, bold=True,
                        color=T.C_TEXT)
-        first = False
         for letter, opt in item["options"]:
-            p = cell.add_paragraph()
-            X.para_props(p, rtl=True, align="both", space_before=0,
-                         space_after=20, line=280)
+            p = para(after=6)
             X.para_indent(p, start=240)
             X.add_text_run(p, "%s) %s" % (letter, opt), font=T.FONT_BODY,
                            size=T.SZ_BODY - 1, color=T.C_TEXT)
+
     for item in q.get("tf", []):
-        cell = _full_row(tbl, 4, cant_split=True, span=4)
-        X.cell_shade(cell, T.C_CELL)
-        X.cell_margins(cell, 50, 85, 50, 85)
-        X.cell_borders(cell, top=("4", T.C_RULE), bottom=("4", T.C_RULE),
-                       left=("12", T.C_RULE), right=("12", T.C_RULE))
-        p = cell.paragraphs[0]
-        X.para_props(p, rtl=True, align="both", space_before=0,
-                     space_after=20, line=280)
+        p = para(after=6, before=40)
         X.add_text_run(p, item["text"], font=T.FONT_BODY, size=T.SZ_BODY,
                        color=T.C_TEXT)
 
-    for item in q.get("generated", []):
-        cell = _full_row(tbl, 4, cant_split=True, span=4)
-        X.cell_shade(cell, T.C_CELL)
-        X.cell_margins(cell, 50, 85, 50, 85)
-        X.cell_borders(cell, top=("4", T.C_RULE), bottom=("4", T.C_RULE),
-                       left=("12", T.C_RULE), right=("12", T.C_RULE))
-        p = cell.paragraphs[0]
-        X.para_props(p, rtl=True, align="both", space_before=0,
-                     space_after=20, line=280)
-        X.add_text_run(p, item["prompt"], font=T.FONT_BODY,
-                       size=T.SZ_BODY, bold=True, color=T.C_TEXT)
-        p = cell.add_paragraph()
-        X.para_props(p, rtl=True, align="both", space_before=0,
-                     space_after=10, line=270)
-        X.add_text_run(p, "المصدر: " + item["answer"][:180],
-                       font=T.FONT_BODY, size=T.SZ_FOOTER + 1,
-                       color=T.C_MUTED)
+    gen = q.get("generated") or []
+    if gen:
+        p = para("right", after=30, before=90)
+        X.add_text_run(p, "أسئلة إضافية مبنية على المحتوى المعروض",
+                       font=T.FONT_HEADING, size=T.SZ_AXIS, bold=True,
+                       color=T.C_HEAD_TEXT)
+        for item in gen:
+            p = para(after=14)
+            X.add_text_run(p, item["prompt"], font=T.FONT_BODY,
+                           size=T.SZ_BODY, color=T.C_TEXT)
 
     key = q.get("key") or {}
     if key:
-        cell = _full_row(tbl, 4, cant_split=True, span=4)
-        X.cell_shade(cell, T.C_LABEL_FILL)
-        X.cell_margins(cell, 60, 85, 60, 85)
-        X.cell_borders(cell, top=("4", T.C_RULE), bottom=("4", T.C_RULE),
-                       left=("12", T.C_RULE), right=("12", T.C_RULE))
-        p = cell.paragraphs[0]
-        X.para_props(p, rtl=True, align="right", space_before=0,
-                     space_after=30, line=260, keep_next=True)
+        p = para("right", after=30, before=90)
         X.add_text_run(p, "مفتاح الإجابة للمعلم", font=T.FONT_HEADING,
-                       size=T.SZ_AXIS, bold=True, color=T.C_HEAD_TEXT)
-        for kind, label in (("mc", "الاختيار من متعدد"), ("tf", "الصح والخطأ")):
+                       size=T.SZ_AXIS, bold=True, color=T.C_ACCENT_BLUE)
+        for kind, label in (("mc", "الاختيار من متعدد"),
+                            ("tf", "الصح والخطأ")):
             if not key.get(kind):
                 continue
             bits = []
@@ -1014,9 +1024,9 @@ def _assessment_rows(tbl, model):
                 v = key[kind][n]
                 v = "صح" if v == "ص" and kind == "mc" else v
                 bits.append("%s ـ %s" % (_ar_num(n).rstrip("."), v))
-            p = cell.add_paragraph()
-            X.para_props(p, rtl=True, align="right", space_before=0,
-                         space_after=20, line=270)
+            p = para("right", after=10)
             X.add_text_run(p, "%s: %s" % (label, "، ".join(bits)),
                            font=T.FONT_BODY, size=T.SZ_BODY - 1,
                            color=T.C_TEXT)
+
+

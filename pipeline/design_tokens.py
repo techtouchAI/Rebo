@@ -130,3 +130,8 @@ FIGURE_ROW_MIN_TWIPS = 1400
 SECTION_MIN_TWIPS = 760
 PLATE_NOTE = ("رسم تعليمي مولّد لشرح الموضوع — ليس عملاً فنياً تاريخياً "
               "ولا يُنسب إلى فنان.")
+
+# A table row taller than the print area cannot be laid out by Word, so long
+# axis bodies are emitted as consecutive rows cut at the author's own sentence
+# ends.  ~1100 characters fills roughly 20 lines of the content column.
+ROW_TEXT_LIMIT = 1100

@@ -333,11 +333,14 @@ def test_header_and_footer_defined(built):
         assert any("footer" in n and n.endswith(".xml") for n in names), i
         root = xml(rec["path"])
         sect = root.find(".//" + W + "sectPr")
-        assert sect.find(W + "titlePg") is not None, "needs different first page"
-        types = {r.get(W + "type") for r in sect.findall(W + "headerReference")}
-        assert "first" in types and "default" in types, i
-        types = {r.get(W + "type") for r in sect.findall(W + "footerReference")}
-        assert "first" in types and "default" in types, i
+        # One header/footer pair serves EVERY page: continuation pages must
+        # never lose the identity.  A titlePg split would make page 2 the
+        # "first" page of the artwork, which is exactly the defect this fixes.
+        assert sect.find(W + "titlePg") is None, "unexpected titlePg"
+        assert "default" in {r.get(W + "type") for r in
+                             sect.findall(W + "headerReference")}, i
+        assert "default" in {r.get(W + "type") for r in
+                             sect.findall(W + "footerReference")}, i
 
 
 # --------------------------------------------------------------------------- #
@@ -1095,3 +1098,76 @@ def test_37_verbatim_and_teaching_views_both_exist(teaching):
             "%s: the teaching view is not condensed" % i)
         assert len(short) > len(long) * 0.5, (
             "%s: over-condensed" % i)
+
+
+# ---- 38. every taught block physically reaches the DOCX ----------------
+def test_38_taught_blocks_reach_the_document(teaching):
+    """The model and the file must agree: nothing may be lost in rendering."""
+    import re
+    from docx import Document
+    for i, rec in teaching.items():
+        doc = Document(rec["docx"])
+        seen, buf = set(), []
+        for t in doc.tables:
+            for r in t.rows:
+                for c in r.cells:
+                    if c._tc in seen:
+                        continue
+                    seen.add(c._tc)
+                    buf.append(c.text)
+        flat = re.sub(r"\s+", "", " ".join(buf))
+        for sec in rec["teaching"]["sections"]:
+            for a in sec["axes"]:
+                for b in a["blocks"]:
+                    key = re.sub(r"\s+", "", b["text"])
+                    assert key in flat, (
+                        "%s: block never reached the page: %r"
+                        % (i, b["text"][:60]))
+
+
+# ---- 39. a row may break across pages (else its tail is dropped) -------
+def test_39_content_rows_may_split(teaching):
+    for i, rec in teaching.items():
+        root = xml(rec["docx"])
+        for t in root.findall(".//" + W + "tbl"):
+            rows = t.findall(W + "tr")
+            if not rows:
+                continue
+            for tr in rows[1:]:
+                tp = tr.find(W + "trPr")
+                if tp is None:
+                    continue
+                cant = tp.find(W + "cantSplit")
+                chars = len("".join(x.text or "" for x in tr.iter(W + "t")))
+                if cant is not None:
+                    # a never-splitting row must fit on one page
+                    assert chars < 1500, (
+                        "%s: %d-char row cannot split" % (i, chars))
+
+
+# ---- 40. the axis title is printed once, not once per piece ------------
+def test_40_axis_heading_paragraph_is_unique(teaching):
+    """A heading is one paragraph. The same words may still occur inside a
+    sentence or in the source's own quiz -- that is not duplication."""
+    import re
+    from docx import Document
+    for i, rec in teaching.items():
+        doc = Document(rec["docx"])
+        seen, heads = set(), []
+        for t in doc.tables:
+            for r in t.rows:
+                for c in r.cells:
+                    if c._tc in seen:
+                        continue
+                    seen.add(c._tc)
+                    heads.extend(p.text for p in c.paragraphs)
+        for sec in rec["teaching"]["sections"]:
+            for a in sec["axes"]:
+                title = re.sub(r"\s+", "", a.get("title") or "")
+                if len(title) < 12:
+                    continue
+                exact = [h for h in heads
+                         if re.sub(r"\s+", "", h).strip(".:") == title.strip(".:")]
+                assert len(exact) <= 1, (
+                    "%s: heading paragraph repeated %d times: %r"
+                    % (i, len(exact), title[:40]))
