@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1116">
+<title>ريبو · التربية الفنية</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- ===================== SPLASH ===================== -->
+<div id="splash" class="splash">
+  <div class="splash-figure">
+    <svg viewBox="0 0 200 200" class="splash-svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="gA" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stop-color="#e8654a"/><stop offset=".55" stop-color="#e8b44a"/><stop offset="1" stop-color="#57c3a7"/>
+        </linearGradient>
+        <linearGradient id="gB" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#7f8cff"/><stop offset="1" stop-color="#57c3a7"/>
+        </linearGradient>
+      </defs>
+      <circle cx="100" cy="100" r="70" fill="none" stroke="url(#gA)" stroke-width="2" stroke-dasharray="3 7" opacity=".7"/>
+      <path d="M100 30 L170 100 L100 170 L30 100 Z" fill="none" stroke="url(#gB)" stroke-width="1.6" opacity=".55"/>
+      <path d="M40 140 C 70 60, 130 60, 160 140" fill="none" stroke="url(#gA)" stroke-width="7" stroke-linecap="round"/>
+      <circle cx="100" cy="100" r="13" fill="url(#gA)"/>
+    </svg>
+  </div>
+  <h1 class="splash-title">ريبو</h1>
+  <p class="splash-sub">التربية الفنية · المرحلة المتوسطة</p>
+  <div class="splash-bar"><i></i></div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="app" class="app" hidden>
+
+  <aside id="drawer" class="drawer" aria-hidden="true">
+    <div class="drawer-head">
+      <div class="brand-mark small">
+        <svg viewBox="0 0 200 200"><use href="#brandGlyph"/></svg>
+      </div>
+      <div>
+        <b>ريبو</b>
+        <span>التربية الفنية</span>
+      </div>
+    </div>
+    <nav class="drawer-nav" id="drawerNav"></nav>
+    <div class="drawer-foot">
+      <div class="mini-stat"><b id="statUnits">13</b><span>وحدة</span></div>
+      <div class="mini-stat"><b id="statPlans">9</b><span>خطة درس</span></div>
+      <div class="mini-stat"><b id="statQ">42</b><span>سؤال</span></div>
+    </div>
+  </aside>
+  <div id="scrim" class="scrim"></div>
+
+  <header class="topbar" id="topbar">
+    <button class="icon-btn" id="menuBtn" aria-label="القائمة">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"/></svg>
+    </button>
+    <div class="topbar-title" id="topbarTitle">ريبو</div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="searchBtn" aria-label="بحث">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.4" stroke="currentColor" stroke-width="1.7" fill="none"/><path d="M16 16l4.2 4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      </button>
+      <button class="icon-btn" id="fsBtn" aria-label="ملء الشاشة">
+        <svg viewBox="0 0 24 24"><path d="M9 4H4v5M15 4h5v5M15 20h5v-5M9 20H4v-5" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="topbar-progress"><i id="readProgress"></i></div>
+  </header>
+
+  <main id="view" class="view" tabindex="-1"></main>
+
+  <nav class="tabbar" id="tabbar">
+    <button class="tab" data-route="home">
+      <svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg>
+      <span>الرئيسية</span>
+    </button>
+    <button class="tab" data-route="index">
+      <svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <span>الفهرس</span>
+    </button>
+    <button class="tab" data-route="studio">
+      <svg viewBox="0 0 24 24"><path d="M4 19c5-1 6-6 8-11 2 5 3 10 8 11" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round"/><circle cx="12" cy="8" r="1.6" fill="currentColor"/></svg>
+      <span>المختبر</span>
+    </button>
+    <button class="tab" data-route="quiz">
+      <svg viewBox="0 0 24 24"><path d="M12 3.5 14.6 9l6 .8-4.4 4.2 1.1 6-5.3-3-5.3 3 1.1-6L3.4 9.8 9.4 9z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/></svg>
+      <span>اختبر نفسك</span>
+    </button>
+    <button class="tab" data-route="plans">
+      <svg viewBox="0 0 24 24"><rect x="4.5" y="5" width="15" height="15" rx="2.5" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M8 3.5v4M16 3.5v4M4.5 10h15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span>الخطط</span>
+    </button>
+  </nav>
+
+  <div id="searchPanel" class="search-panel" hidden>
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" class="s-ico"><circle cx="11" cy="11" r="6.4" stroke="currentColor" stroke-width="1.7" fill="none"/><path d="M16 16l4.2 4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <input id="searchInput" type="search" placeholder="ابحث في المحتوى: المنظور، الألوان، الزخرفة…" autocomplete="off">
+      <button class="icon-btn" id="searchClose" aria-label="إغلاق">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div id="searchResults" class="search-results"></div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="brandGlyph" viewBox="0 0 200 200">
+        <path d="M100 24 L176 100 L100 176 L24 100 Z" fill="none" stroke="currentColor" stroke-width="5" opacity=".35"/>
+        <path d="M38 142 C 70 56, 130 56, 162 142" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round"/>
+        <circle cx="100" cy="100" r="16" fill="currentColor"/>
+      </symbol>
+    </defs>
+  </svg>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
