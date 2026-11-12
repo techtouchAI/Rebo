@@ -221,6 +221,17 @@ jobs:
       - name: Resolve the dependencies
         shell: pwsh
         run: flutter pub get
+      - name: Report the Visual Studio toolchain
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vswhere) {
+            $path = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            Write-Host "::notice::Visual Studio with C++ tools: $path"
+          } else {
+            Write-Host "::warning::vswhere.exe not found"
+          }
+          cmake --version | Select-Object -First 1 | Write-Host
       - name: Precache the Windows engine artifacts
         shell: pwsh
         run: flutter precache --windows
