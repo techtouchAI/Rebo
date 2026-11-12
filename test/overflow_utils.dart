@@ -1,0 +1,39 @@
+import 'dart:math' as math;
+
+import 'package:flutter/rendering.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+/// Finds the flexible rows/columns whose children are laid out past the edge.
+///
+/// The default Flutter error only reports the number of overflowing pixels;
+/// tests need to know *which* row did it, so this walks every [RenderFlex].
+List<String> findFlexOverflows(WidgetTester tester) {
+  final hits = <String>[];
+  for (final render in tester.allRenderObjects) {
+    if (render is! RenderFlex) {
+      continue;
+    }
+    if (!render.hasSize) {
+      continue;
+    }
+    final horizontal = render.direction == Axis.horizontal;
+    final limit = horizontal ? render.size.width : render.size.height;
+    var extent = 0.0;
+    RenderBox? child = render.firstChild;
+    while (child != null) {
+      final data = child.parentData;
+      if (data is FlexParentData) {
+        final edge = horizontal ? data.offset.dx + child.size.width : data.offset.dy + child.size.height;
+        extent = math.max(extent, edge);
+      }
+      child = render.childAfter(child);
+    }
+    if (extent > limit + 0.5) {
+      hits.add(
+        '${render.debugCreator ?? 'Flex'} overflows ${(extent - limit).toStringAsFixed(1)}px '
+        '(${extent.toStringAsFixed(1)} > ${limit.toStringAsFixed(1)}, ${render.direction.name})',
+      );
+    }
+  }
+  return hits;
+}

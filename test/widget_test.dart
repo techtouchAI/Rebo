@@ -7,6 +7,7 @@ import 'package:mirsam/presentation/screens/quiz_screen.dart';
 import 'package:mirsam/presentation/screens/search_screen.dart';
 import 'package:mirsam/presentation/screens/unit_screen.dart';
 
+import 'overflow_utils.dart';
 import 'test_support.dart';
 
 void main() {
@@ -144,6 +145,9 @@ void main() {
     await pumpApplication(tester, size: const Size(390, 844));
 
     expect(find.byType(NavigationBar), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    final overflows = findFlexOverflows(tester);
+    expect(overflows, isEmpty, reason: overflows.join(' || '));
   });
 
   testWidgets('the shell switches to a navigation rail on a desktop window',

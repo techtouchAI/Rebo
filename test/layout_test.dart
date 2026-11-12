@@ -13,6 +13,7 @@ import 'package:mirsam/presentation/screens/search_screen.dart';
 import 'package:mirsam/presentation/screens/settings_screen.dart';
 import 'package:mirsam/presentation/screens/unit_screen.dart';
 
+import 'overflow_utils.dart';
 import 'test_support.dart';
 
 /// Every screen must fit a 360/390 logical pixel phone without any overflow.
@@ -21,7 +22,9 @@ const Size phone = Size(390, 844);
 Future<void> expectFitsPhone(WidgetTester tester, Widget screen, String name) async {
   await pumpScreen(tester, screen, size: phone);
   final error = tester.takeException();
-  expect(error, isNull, reason: 'layout overflow on $name');
+  final overflows = findFlexOverflows(tester);
+  expect(overflows, isEmpty, reason: 'layout overflow on $name: ${overflows.join(' || ')}');
+  expect(error, isNull, reason: 'exception on $name');
 }
 
 void main() {

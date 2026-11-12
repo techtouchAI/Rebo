@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mirsam/app.dart';
+import 'package:mirsam/core/theme/app_colors.dart';
 import 'package:mirsam/core/theme/app_theme.dart';
 import 'package:mirsam/data/local/asset_content_repository.dart';
 import 'package:mirsam/data/local/memory_progress_repository.dart';
@@ -97,7 +98,10 @@ Future<AppState> pumpScreen(
           GlobalCupertinoLocalizations.delegate,
         ],
         theme: AppTheme.light(),
-        home: child,
+        home: Material(
+          color: AppColors.paper,
+          child: child,
+        ),
       ),
     ),
   );
