@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'app.dart';
 import 'presentation/state/bootstrap.dart';
 
 void main() {

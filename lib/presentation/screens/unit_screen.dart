@@ -92,7 +92,7 @@ class _UnitScreenState extends State<UnitScreen> {
           ),
           IconButton(
             tooltip: 'نسخ نص الوحدة للمشاركة',
-            onPressed: () => _copyUnit(context, state, unit),
+            onPressed: () => _copyUnit(state, unit),
             icon: const Icon(Icons.ios_share),
           ),
           PopupMenuButton<String>(
@@ -171,7 +171,7 @@ class _UnitScreenState extends State<UnitScreen> {
                           .map((GlossaryTerm term) => ActionChip(
                                 avatar: const Icon(Icons.translate, size: 16),
                                 label: Text(term.term),
-                                onPressed: () => _showTerm(context, term),
+                                onPressed: () => _showTerm(term),
                               ))
                           .toList(growable: false),
                     ),
@@ -193,7 +193,7 @@ class _UnitScreenState extends State<UnitScreen> {
 
   Color colorsSecondary(BuildContext context) => Theme.of(context).colorScheme.secondary;
 
-  Future<void> _copyUnit(BuildContext context, AppState state, LearningUnit unit) async {
+  Future<void> _copyUnit(AppState state, LearningUnit unit) async {
     final text = state.shareTextOfUnit(unit);
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) {
@@ -204,7 +204,7 @@ class _UnitScreenState extends State<UnitScreen> {
     );
   }
 
-  void _showTerm(BuildContext context, GlossaryTerm term) {
+  void _showTerm(GlossaryTerm term) {
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
