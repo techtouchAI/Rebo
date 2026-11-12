@@ -104,7 +104,7 @@ def report_test(path: Path, status: int = 0) -> int:
             if event.get("result") in {"failure", "error"} and not event.get("hidden"):
                 failing.append(int(event.get("testID", -1)))
         elif kind == "error":
-            name = names.get(event.get("testID", -1), "unrelated error")
+            name = names.get(event.get("testID", -1)) or names.get(current) or "unrelated error"
             message = " ".join(str(event.get("error", "")).split())
             trace = str(event.get("stackTrace", "")).splitlines()
             if message:
