@@ -149,13 +149,18 @@ def report_log(path: Path) -> int:
         return 0
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     matched: list[str] = []
-    for raw in lines:
+    for index, raw in enumerate(lines):
         line = raw.strip()
         lowered = line.lower()
         if not line or len(line) < 6:
             continue
         if any(hint in lowered for hint in ERROR_HINTS):
-            matched.append(line)
+            following = ""
+            for candidate in lines[index + 1 : index + 4]:
+                if candidate.strip():
+                    following = candidate.strip()
+                    break
+            matched.append(f"{line} {following}".strip())
     seen: set[str] = set()
     for line in matched:
         if line in seen:
@@ -164,8 +169,10 @@ def report_log(path: Path) -> int:
         if len(seen) > MAX_ANNOTATIONS:
             break
         emit("error", line)
-    if not matched:
-        tail = " | ".join(item.strip() for item in lines[-12:] if item.strip())
+    tail = " | ".join(item.strip() for item in lines[-16:] if item.strip())
+    if matched:
+        emit("error", f"log tail: {tail}")
+    else:
         emit("error", f"no explicit error line found; tail: {tail}")
     print(f"## build log: {len(lines)} lines, {len(matched)} error-like lines")
     return 0
