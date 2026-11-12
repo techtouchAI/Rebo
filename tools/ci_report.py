@@ -112,8 +112,8 @@ def report_test(path: Path, status: int = 0) -> int:
         name = names.get(test_id, "unnamed test")
         body = messages.get(test_id, [])
         highlight = [line for line in body if "EXCEPTION" in line or "was thrown" in line or "Unable to" in line]
-        first_line = highlight[0] if highlight else next((line for line in body if line.strip()), "test failed")
-        errors.insert(0, (name, first_line))
+        joined = " ".join(line.strip() for line in body if line.strip()) or "test failed"
+        errors.insert(0, (name, joined))
 
     emitted: set[str] = set()
     for name, message in errors:
