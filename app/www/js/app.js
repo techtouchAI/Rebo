@@ -118,12 +118,39 @@
   }
 
   /* ---------------- views ---------------- */
+  /* Decorative hero composition: three nested arcs + a diamond, echoing the
+     app mark. Pure SVG, no assets, deterministic. */
+  function heroArt() {
+    return '<svg class="hero-art" viewBox="0 0 420 420" aria-hidden="true">' +
+      '<defs>' +
+        '<linearGradient id="ha1" x1="0" y1="0" x2="1" y2="1">' +
+          '<stop offset="0" stop-color="#7ad6c0" stop-opacity=".75"/>' +
+          '<stop offset="1" stop-color="#7ad6c0" stop-opacity="0"/>' +
+        '</linearGradient>' +
+        '<linearGradient id="ha2" x1="1" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="#e8c07d" stop-opacity=".65"/>' +
+          '<stop offset="1" stop-color="#e8c07d" stop-opacity="0"/>' +
+        '</linearGradient>' +
+      '</defs>' +
+      '<circle cx="210" cy="210" r="196" fill="none" stroke="url(#ha1)" stroke-width="1.5"/>' +
+      '<circle cx="210" cy="210" r="150" fill="none" stroke="rgba(255,255,255,.13)" stroke-width="1.2"/>' +
+      '<circle cx="210" cy="210" r="104" fill="none" stroke="url(#ha2)" stroke-width="1.5"/>' +
+      '<path d="M210 96 L324 210 L210 324 L96 210 Z" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="1.6"/>' +
+      '<path d="M210 140 L280 210 L210 280 L140 210 Z" fill="none" stroke="rgba(122,214,192,.5)" stroke-width="1.4"/>' +
+      '<circle cx="210" cy="210" r="7" fill="#e8c07d"/>' +
+      '<circle cx="324" cy="210" r="4" fill="#7ad6c0"/>' +
+      '<circle cx="96" cy="210" r="4" fill="rgba(255,255,255,.5)"/>' +
+      '<circle cx="210" cy="96" r="3" fill="rgba(255,255,255,.4)"/>' +
+      '<circle cx="210" cy="324" r="3" fill="rgba(255,255,255,.4)"/>' +
+      '</svg>';
+  }
+
   function viewHome() {
     var last = store.get('last', null);
     var lastUnit = last ? C.units.filter(function (u) { return u.id === last.id; })[0] : null;
     var grades = ['الصف الأول المتوسط', 'الصف الثاني المتوسط', 'الصف الثالث المتوسط'];
     var html = '';
-    html += '<section class="hero"><div class="hero-in">' +
+    html += '<section class="hero">' + heroArt() + '<div class="hero-in">' +
       '<span class="eyebrow">دليل المعلم · المرحلة المتوسطة</span>' +
       '<h1>التربية الفنية،<br>بروحٍ جديدة.</h1>' +
       '<p>كل وحدات دليل التربية الفنية للمرحلة المتوسطة، بخطةٍ واحدة واضحة: مواضيع، أهداف، أدوات، أسئلة تقويم، ومختبر تفاعلي للألوان والمنظور.</p>' +
@@ -215,7 +242,7 @@
         '<span class="n">' + arDigit(u.id) + '</span>' +
         '<span><span class="t">' + esc(u.title.replace(/^الصف \S+ المتوسط - /, '')) + '</span><br>' +
         '<span class="m">' + esc(u.grade) + ' · ' + esc(unitShort(u)) + ' · ' + arDigit(u.sections.length) + ' مواضيع</span></span>' +
-        '<span class="pill ' + m.cls + '">' + arDigit(u.pages || '') + '</span></button>';
+        '<span class="pill ' + m.cls + '">ص ' + arDigit(u.pages || '') + '</span></button>';
     });
     html += '</div>';
     html += '<div class="section-head"><h2>خطط الدروس الأسبوعية</h2></div><div class="toc-list">';
@@ -368,9 +395,20 @@
   function viewPlan(params) {
     var p = C.plans.filter(function (x) { return x.name === params.id; })[0];
     if (!p) return '<div class="empty">الخطة غير موجودة.</div>';
-    var html = '<span class="pill chip-teal">خطة أسبوعية · ' + esc(p.kind || '') + '</span>' +
-      '<h1 style="font-size:clamp(20px,4.6vw,27px);margin:12px 0 4px">' + esc(p.title) + '</h1>' +
-      '<p style="color:var(--text-mute);font-size:13px">' + esc(p.grade) + ' · مادة التربية الفنية</p>';
+    var html = '<div class="unit-hero uh-plain plan-hero">' +
+      '<div class="uh-grad"></div><div class="uh-body">' +
+      '<span class="pill chip-teal">خطة أسبوعية · ' + esc(p.kind || '') + '</span>' +
+      '<h1 style="margin-top:8px">' + esc(p.title) + '</h1>' +
+      '<div class="unit-meta"><span class="pill">' + esc(p.grade) + '</span>' +
+      '<span class="pill">' + arDigit((p.specific || []).length) + ' هدفًا خاصًا</span>' +
+      '<span class="pill">مادة التربية الفنية</span></div>' +
+      '</div></div>';
+
+    html += '<div class="reader-tools">' +
+      '<button class="tool-btn" data-toggle="serif">خط الأميري</button>' +
+      '<button class="tool-btn" data-toggle="large">تكبير الخط</button>' +
+      '<span class="spacer"></span>' +
+      '<button class="tool-btn" data-go="plans">كل الخطط</button></div>';
 
     html += '<div class="kv-grid" style="margin-top:16px">' +
       (p.objectives ? '<dl class="kv"><dt>الأهداف العامة</dt><dd>' + esc(p.objectives) + '</dd></dl>' : '') +
@@ -765,7 +803,7 @@
     var html = '<div class="lightbox" id="lightbox"><button class="lb-close" aria-label="إغلاق">✕</button>' +
       '<div class="lb-stage">' + items.map(function (it, i) {
         return '<div class="lb-item' + (i === (index || 0) ? ' on' : '') + '">' +
-          (it.type === 'gen' ? artSVG(u, false) : '<img src="' + it.src + '" alt="لوحة من دليل المعلم">') + '</div>';
+          (it.type === 'gen' ? artSVG(u, false) : '<img src="' + it.src + '" alt="لوحة من دليل المعلم" data-lbimg>') + '</div>';
       }).join('') + '</div>' +
       '<div class="lb-nav"><button data-lb="prev">›</button><span id="lbCount"></span><button data-lb="next">‹</button></div>' +
       '<p class="lb-cap">' + esc(u.title) + ' · ' + esc(unitShort(u)) + ' · دليل المعلم ص ' + arDigit(u.pages || '—') + '</p></div>';
@@ -775,6 +813,8 @@
     var lb = $('#lightbox');
     var cur = index || 0;
     var list = $$('.lb-item', lb);
+    /* keep the neighbours loaded so prev/next is instant */
+    Array.prototype.forEach.call(lb.querySelectorAll('img'), function (im) { im.loading = 'eager'; });
     function show(i) {
       cur = (i + list.length) % list.length;
       list.forEach(function (el, k) { el.classList.toggle('on', k === cur); });
@@ -1028,9 +1068,15 @@
     ].map(function (r) {
       return '<button data-go="' + r[0] + '"><span class="dot"></span>' + r[1] + '</button>';
     }).join('') + '<div style="height:10px"></div>' +
-      C.units.map(function (u) {
-        return '<button data-unit="' + u.id + '"><span class="dot" style="color:' + gmeta(u.grade).color + '"></span>' +
-          esc(shorten(u.title.replace(/^الصف \S+ المتوسط - /, ''), 34)) + '</button>';
+      Object.keys(GRADE_META).map(function (grade) {
+        var units = C.units.filter(function (u) { return u.grade === grade; });
+        if (!units.length) return '';
+        return '<span class="drawer-sec">' + esc(grade) + '</span>' +
+          units.map(function (u) {
+            var topic = (u.title || '').split(' - ').pop().replace(/^الوحدة[^:]{0,12}:\s*/, '');
+            return '<button data-unit="' + u.id + '"><span class="dot" style="color:' + gmeta(grade).color + '"></span>' +
+              esc(unitShort(u) + ' · ' + shorten(topic, 30)) + '</button>';
+          }).join('');
       }).join('');
   }
 
@@ -1043,11 +1089,17 @@
     var p = parseHash();
     render(p.name, p.params);
     depth = 0;
-    setTimeout(function () {
-      $('#splash').classList.add('hide');
-      $('#app').hidden = false;
-      setTimeout(function () { var s = $('#splash'); if (s) s.remove(); }, 600);
-    }, 900);
+    $('#app').hidden = false;
+    var splash = $('#splash');
+    if (splash) {
+      /* the overlay also fades itself via CSS, so a throttled timer can never
+         leave the app stuck behind the splash screen */
+      splash.addEventListener('animationend', function () { if (splash.parentNode) splash.remove(); });
+      setTimeout(function () {
+        splash.classList.add('hide');
+        setTimeout(function () { if (splash.parentNode) splash.remove(); }, 600);
+      }, 850);
+    }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();

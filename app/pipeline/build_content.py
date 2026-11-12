@@ -94,7 +94,8 @@ def para_runs(p):
 
 
 def clean(t):
-    t = t.replace('\u200b', ' ').replace('\u00a0', ' ')
+    t = (t.replace('\u200b', ' ').replace('\u200c', '').replace('\u200d', '')
+         .replace('\u00a0', ' ').replace('\ufeff', ''))
     return re.sub(r'[ \t]+', ' ', t).strip()
 
 
@@ -391,6 +392,109 @@ def parse_unit(prefix, root_dir):
 
 
 # -------------------------------------------------------------- lesson plans
+LABEL_SEQ = [
+    ('الموضوع', 'title'),
+    ('الأهداف العامة', 'objectives'),
+    ('الأهداف الخاصة', 'specific'),
+    ('الوسائل التعليمية', 'tools'),
+    ('المقدمة', 'intro'),
+    ('العرض', 'present'),
+]
+
+
+def _collapse(lines):
+    """Drop the duplicated/blank cells Word produces for merged table rows."""
+    out = []
+    for line in lines:
+        line = line.replace('\u00a0', ' ').strip()
+        if not line:
+            continue
+        if out and (norm_key(out[-1]) == norm_key(line)
+                    or norm_key(out[-1]).endswith(norm_key(line))
+                    or norm_key(line).endswith(norm_key(out[-1])) and len(line) < 22):
+            if len(line) > len(out[-1]):
+                out[-1] = line
+            continue
+        out.append(line)
+    return out
+
+
+def parse_plan_fallback(paras, plan):
+    """Some lesson plans lay the table out label-after-content (or the table
+    cells are merged beyond recognition). Recover the fields by reading the
+    plan as a linear document and pairing each field label with the paragraph
+    directly above it."""
+    lines = _collapse([p['t'] for p in paras])
+    keys = [norm_key(l) for l in lines]
+    labels = [norm_key(x) for x, _ in LABEL_SEQ]
+
+    # 1) collapse the runs of label cells into a single (field, end_index) list
+    marks, i = [], 0
+    while i < len(lines):
+        for n in range(1, 4):           # a label can be split across 2–3 cells
+            blob = ''.join(keys[i:i + n])
+            hit = next((f for lab, f in LABEL_SEQ if blob == norm_key(lab)), None)
+            if hit:
+                marks.append((hit, i, i + n))
+                i += n
+                break
+        else:
+            i += 1
+
+    # 2) fill each field from the text that sits *above* its label run, taking
+    #    the lines back to (but not past) the previous label
+    found = {}
+    for idx, (field, start, _end) in enumerate(marks):
+        floor = marks[idx - 1][2] if idx else 0
+        picked = []
+        for back in range(start - 1, floor - 1, -1):
+            cand = lines[back]
+            if norm_key(cand) in labels or len(cand) < 4:
+                continue
+            picked.insert(0, cand)
+            if len(' '.join(picked)) > 24 and field != 'title':
+                break
+        if picked:
+            found[field] = ' '.join(picked)
+    return found
+
+
+def parse_plan_degenerate(paras, plan, lines=None):
+    """The «التعرف على الطلاب» plan is a single merged table cell: labels and
+    contents are split into separate rows, so position-based parsing fails.
+    Classify the lines by shape instead."""
+    lines = lines or _collapse([p['t'] for p in paras])
+    labels = [norm_key(x) for x, _ in LABEL_SEQ]
+    noise = {'الأهداف', 'العامة', 'الخاصة', 'الوسائل', 'التعليمية', 'الموضوع',
+             'المقدمة', 'العرض', 'ملاحظات', 'الصفوالشعبة', 'الدرس', 'معلومات'}
+    content = [l for l in lines
+               if norm_key(l) not in labels and norm_key(l) not in noise
+               and not re.match(r'^(الأول|الثاني|الثالث) المتوسط$', l)
+               and 'الخطة الأسبوعية' not in l and len(l) > 3]
+    if not content:
+        return plan
+    TOOL = re.compile('السبورة|وسائل|صور|نماذج|مصباح|ألوان|خامات|أدوات|دفاتر')
+    INTRO = re.compile('الترحيب|تهيئة|استذكار|سؤال|توجيه|تعريف الطلاب')
+    ORDINAL = re.compile(r'^(الأول|الثاني|الثالث|الرابع)$')
+
+    tools = [l for l in content if TOOL.search(l) and len(l.split()) <= 3]
+    intro = next((l for l in content if INTRO.search(l) and l not in tools), None)
+    rest = [l for l in content if l not in tools and l != intro
+            and not ORDINAL.match(l)]
+    if rest:
+        plan.setdefault('title', rest[0])
+    long_lines = [l for l in rest if len(l.split()) > 3]
+    if long_lines:
+        plan.setdefault('objectives', long_lines[0])
+    if len(long_lines) > 1:
+        plan.setdefault('specific', long_lines[1:])
+    if tools:
+        plan.setdefault('tools', tools[:4])
+    if intro:
+        plan.setdefault('intro', intro)
+    return plan
+
+
 def parse_plan(name, root_dir):
     path = os.path.join(root_dir, 'محتوى مكتمل', name + '.docx')
     if not os.path.exists(path):
@@ -420,60 +524,101 @@ def parse_plan(name, root_dir):
                 plan['title'] = content
             else:
                 plan[label] = content
+    lines_used = _collapse([p['t'] for p in paras])
+    if not plan.get('objectives') or not plan.get('intro'):
+        for field, value in parse_plan_fallback(paras, plan).items():
+            plan.setdefault(field, value)
+    if len(plan.get('objectives') or '') < 12 or not plan.get('intro'):
+        plan = parse_plan_degenerate(paras, plan, lines_used)
+    if isinstance(plan.get('tools'), str):
+        plan['tools'] = [x.strip() for x in re.split(r'\s*[–-]\s*', plan['tools'])
+                         if x.strip()]
+    if isinstance(plan.get('specific'), str):
+        plan['specific'] = [s.strip() for s in SENT.split(plan['specific'])
+                            if len(s.strip()) > 6]
     t = re.sub(r'^الموضوع\s*', '', plan.get('title', name))
     t = re.sub(r'\s*(الأول|الثاني|الثالث) المتوسط\s*', ' ', t)
-    plan['title'] = re.sub(r'\s+', ' ', t).strip() or name
+    t = re.sub(r'\s+', ' ', t).strip()
+    plan['title'] = t if 0 < len(t) <= 60 else name
     return plan
 
 
 # ------------------------------------------------------------------- book
 def parse_intro(root_dir):
+    """The introduction document is hard-wrapped: sentences are broken across
+    lines and lists are marked with Arabic numerals. Rebuild readable blocks."""
     path = os.path.join(root_dir, 'محتوى مكتمل', 'مقدمة.docx')
     paras, tables, media, z = load(path)
     lines = [p['t'] for p in paras]
-    intro = {'title': 'التربية الفنية — المقدمة', 'sections': [], 'maps': []}
-    cur = None
-    heads = ('انواع طرائق التدريس', 'الأهداف العامة لمادة التربية الفنية')
-    for t in lines:
-        if t in heads or re.match(r'^(الأهداف العامة|التوجيهات العامة)$', t):
-            cur = {'title': t, 'paras': []}
-            intro['sections'].append(cur)
-        else:
-            if cur is None:
-                cur = {'title': 'المقدمة', 'paras': []}
-                intro['sections'].append(cur)
-            cur['paras'].append(t)
-    for sec in intro['sections']:
-        keep = []
-        for line in sec['paras']:
-            if re.match(r'^[\u0660-\u0669\d]+\s*-', line.strip()):
-                keep.append('\n• ' + re.sub(r'^[\u0660-\u0669\d]+\s*-\s*', '', line.strip()))
-            else:
-                keep.append(line)
-        txt = re.sub(r'\s*\n\s*', '\n', ' '.join(keep))
-        sec['paras'] = chunk_paragraphs(txt.split('\n'), target=520)
+    NUM = re.compile(r'^[\u0660-\u0669\d]+\s*[-.)]\s*')
+    HEAD = re.compile(r'^(انواع طرائق التدريس|أنواع طرائق التدريس|'
+                      r'الأهداف العامة لمادة التربية الفنية.*)$')
 
-    cur_map = None
-    for t in lines:
-        if t == 'المرحلة المتوسطة':
-            cur_map = {'grade': None, 'units': []}
-            intro['maps'].append(cur_map)
+    intro = {'title': 'التربية الفنية — المقدمة', 'sections': [], 'maps': []}
+    sec, buf = None, []
+
+    def flush():
+        if buf:
+            text = re.sub(r'\s+', ' ', ' '.join(buf)).strip()
+            if text:
+                sec['paras'].append(text)
+            buf.clear()
+
+    def new_section(title):
+        nonlocal sec
+        if sec is not None:
+            flush()
+        sec = {'title': title, 'paras': []}
+        intro['sections'].append(sec)
+
+    DAY = {'السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الاربعاء', 'الخميس', 'الجمعة'}
+    skip = {'اليوم', 'الدرس الاول', 'الدرس الثاني', 'الدرس الثالث', 'الدرس الرابع',
+            'الدرس الخامس', 'الدرس السادس', 'التربية الفنية', 'المقدمة'} | DAY
+    for line in lines:
+        if line in skip:
             continue
-        if cur_map is None:
+        if line == 'المرحلة المتوسطة' or re.match(r'^الصف (الأول|الثاني|الثالث)$', line):
+            break                      # curriculum map follows, parsed below
+        if HEAD.match(line):
+            new_section(line.strip())
             continue
-        if re.match(r'^الصف (الأول|الثاني|الثالث)$', t):
-            cur_map['grade'] = t.replace('الصف ', '')
+        if sec is None:
+            new_section('المقدمة')
+        if NUM.match(line):
+            flush()
+            buf.append(NUM.sub('', line))
+        elif line.startswith(('أ -', 'ب -', 'ج -')):
+            flush()
+            buf.append(line)
+        elif buf and len(line) < 40 and not buf[-1].rstrip().endswith(('.', '،', ':')):
+            buf.append(line)          # continuation of a hard-wrapped line
+        else:
+            buf.append(line)
+    flush()
+    # drop the empty trailing section created by headings with no prose
+    intro['sections'] = [x for x in intro['sections'] if x['paras']]
+
+    # ---- curriculum map (الصف ← الوحدات ← الموضوعات)
+    cur, grade, unit = None, None, None
+    for line in lines:
+        if line == 'المرحلة المتوسطة':
+            grade, unit = None, None
             continue
-        if 'الوحدة' in t or re.match(r'^[\u0660-\u0669\d]+\s*-', t):
-            if not cur_map['units']:
-                cur_map['units'].append({'name': t.replace('الوحدة ', '').strip(), 'items': []})
-                continue
-            if re.match(r'^[\u0660-\u0669\d]+\s*-', t):
-                cur_map['units'][-1]['items'].append(
-                    re.sub(r'^[\u0660-\u0669\d]+\s*-\s*', '', t).strip())
-            else:
-                cur_map['units'].append({'name': t.replace('الوحدة ', '').strip(), 'items': []})
-    intro['maps'] = [m for m in intro['maps'] if m['grade']]
+        if re.match(r'^الصف (الأول|الثاني|الثالث)$', line):
+            grade = line.replace('الصف ', '')
+            cur = {'grade': grade, 'units': []}
+            intro['maps'].append(cur)
+            unit = None
+            continue
+        if cur is None:
+            continue
+        if line.startswith('الوحدة'):
+            unit = {'name': re.sub(r'^الوحدة\s*', '', line).strip(' /'), 'items': []}
+            cur['units'].append(unit)
+            continue
+        if unit is not None and NUM.match(line):
+            unit['items'].append(NUM.sub('', line).strip())
+    intro['maps'] = [m for m in intro['maps'] if m['units']]
     return intro
 
 
