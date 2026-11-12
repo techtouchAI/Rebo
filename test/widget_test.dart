@@ -29,9 +29,7 @@ void main() {
 
   testWidgets('the index lists every grade and its units', (WidgetTester tester) async {
     await pumpApplication(tester);
-    await tester.tap(find.text('الفهرس').first);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+    await tapDestination(tester, 'الفهرس');
 
     expect(find.byType(IndexScreen), findsOneWidget);
     expect(find.textContaining('الصف الأول المتوسط'), findsWidgets);
@@ -40,11 +38,16 @@ void main() {
 
   testWidgets('opening a unit shows its content', (WidgetTester tester) async {
     await pumpApplication(tester);
-    await tester.tap(find.text('الفهرس').first);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+    await tapDestination(tester, 'الفهرس');
 
-    await tester.tap(find.textContaining('الوحدة الأولى: التعبير الفني').first);
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(IndexScreen),
+            matching: find.textContaining('الوحدة الأولى: التعبير الفني'),
+          )
+          .first,
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -55,10 +58,15 @@ void main() {
   testWidgets('opening a unit records it as read and keeps the progress',
       (WidgetTester tester) async {
     final state = await pumpApplication(tester);
-    await tester.tap(find.text('الفهرس').first);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
-    await tester.tap(find.textContaining('الوحدة الأولى: التعبير الفني').first);
+    await tapDestination(tester, 'الفهرس');
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(IndexScreen),
+            matching: find.textContaining('الوحدة الأولى: التعبير الفني'),
+          )
+          .first,
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
@@ -105,18 +113,14 @@ void main() {
 
   testWidgets('the favorites tab starts with an empty state', (WidgetTester tester) async {
     await pumpApplication(tester);
-    await tester.tap(find.text('المفضلة').first);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+    await tapDestination(tester, 'المفضلة');
 
     expect(find.textContaining('لا توجد عناصر محفوظة'), findsOneWidget);
   });
 
   testWidgets('dark mode can be switched from the settings page', (WidgetTester tester) async {
     final state = await pumpApplication(tester);
-    await tester.tap(find.text('الإعدادات').first);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+    await tapDestination(tester, 'الإعدادات');
 
     await tester.tap(find.text('ليلي').first);
     await tester.pump();
@@ -131,9 +135,7 @@ void main() {
       (WidgetTester tester) async {
     final memory = ReadingProgress(favorites: <String>{'g1-u1'});
     await pumpApplication(tester, progress: memory);
-    await tester.tap(find.text('المفضلة').first);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+    await tapDestination(tester, 'المفضلة');
 
     expect(find.textContaining('الوحدات المحفوظة'), findsOneWidget);
   });

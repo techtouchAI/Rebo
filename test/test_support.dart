@@ -38,6 +38,17 @@ AppState buildState({
   );
 }
 
+/// Taps one of the four shell destinations, whichever navigation widget the
+/// current window size uses.
+Future<void> tapDestination(WidgetTester tester, String label) async {
+  final rail = find.byType(NavigationRail);
+  final bar = find.byType(NavigationBar);
+  final host = rail.evaluate().isNotEmpty ? rail : bar;
+  await tester.tap(find.descendant(of: host, matching: find.text(label)).first);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 250));
+}
+
 /// The real application widget tree, with an in-memory progress store.
 Future<AppState> pumpApplication(
   WidgetTester tester, {
@@ -46,7 +57,10 @@ Future<AppState> pumpApplication(
 }) async {
   final library = await ensureLibrary();
   final state = buildState(library: library, progress: progress);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetDevicePixelRatio);
   await tester.binding.setSurfaceSize(size);
+  addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(
     AppScope(
       state: state,
@@ -67,7 +81,10 @@ Future<AppState> pumpScreen(
 }) async {
   final library = await ensureLibrary();
   final state = buildState(library: library, progress: progress);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetDevicePixelRatio);
   await tester.binding.setSurfaceSize(size);
+  addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(
     AppScope(
       state: state,
