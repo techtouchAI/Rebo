@@ -29,28 +29,18 @@ class SettingsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              SegmentedButton<AppThemeMode>(
-                segments: const <ButtonSegment<AppThemeMode>>[
-                  ButtonSegment<AppThemeMode>(
-                    value: AppThemeMode.system,
-                    label: Text('النظام'),
-                    icon: Icon(Icons.brightness_auto_outlined),
-                  ),
-                  ButtonSegment<AppThemeMode>(
-                    value: AppThemeMode.light,
-                    label: Text('نهاري'),
-                    icon: Icon(Icons.light_mode_outlined),
-                  ),
-                  ButtonSegment<AppThemeMode>(
-                    value: AppThemeMode.dark,
-                    label: Text('ليلي'),
-                    icon: Icon(Icons.dark_mode_outlined),
-                  ),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: <Widget>[
+                  for (final option in _themeOptions)
+                    ChoiceChip(
+                      avatar: Icon(option.icon, size: 18),
+                      label: Text(option.label),
+                      selected: state.progress.themeMode == option.mode,
+                      onSelected: (_) => state.setThemeMode(option.mode),
+                    ),
                 ],
-                selected: <AppThemeMode>{state.progress.themeMode},
-                onSelectionChanged: (Set<AppThemeMode> value) {
-                  state.setThemeMode(value.first);
-                },
               ),
               const SizedBox(height: AppSpacing.lg),
               Row(
@@ -219,6 +209,21 @@ class SettingsScreen extends StatelessWidget {
       }
     }
   }
+}
+
+/// Theme choices offered on the settings page.
+const List<_ThemeOption> _themeOptions = <_ThemeOption>[
+  _ThemeOption('النظام', Icons.brightness_auto_outlined, AppThemeMode.system),
+  _ThemeOption('نهاري', Icons.light_mode_outlined, AppThemeMode.light),
+  _ThemeOption('ليلي', Icons.dark_mode_outlined, AppThemeMode.dark),
+];
+
+class _ThemeOption {
+  const _ThemeOption(this.label, this.icon, this.mode);
+
+  final String label;
+  final IconData icon;
+  final AppThemeMode mode;
 }
 
 class _SettingsCard extends StatelessWidget {

@@ -162,22 +162,23 @@ class _HeroPanel extends StatelessWidget {
             size: 68,
           ),
           const SizedBox(width: AppSpacing.md),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(
-                'تقدّمك في الاستكشاف',
-                style: theme.textTheme.labelLarge?.copyWith(color: Colors.white),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${toArabicDigits('${state.readUnitsCount}')} من ${toArabicDigits('${state.totalUnits}')} وحدة',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.85),
-                  fontSize: 13,
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  'تقدّمك في الاستكشاف',
+                  style: theme.textTheme.labelLarge?.copyWith(color: Colors.white),
                 ),
-              ),
+                const SizedBox(height: 2),
+                Text(
+                  '${toArabicDigits('${state.readUnitsCount}')} / ${toArabicDigits('${state.totalUnits}')} وحدة',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 13,
+                  ),
+                ),
             ],
           ),
         ],

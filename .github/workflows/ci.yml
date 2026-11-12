@@ -145,6 +145,7 @@ jobs:
           $version = $env:FLUTTER_VERSION
           $manifestUrl = 'https://storage.googleapis.com/flutter_infra_release/releases/releases_windows.json'
           $archivePath = "stable/windows/flutter_windows_$version-stable.zip"
+          $listed = $false
           try {
             $manifest = Invoke-RestMethod -Uri $manifestUrl -UseBasicParsing
             $release = $manifest.releases |
@@ -152,6 +153,7 @@ jobs:
               Select-Object -First 1
             if ($release) {
               $archivePath = $release.archive
+              $listed = $true
               Write-Host "Manifest archive: $archivePath"
             } else {
               Write-Host "::warning::version $version not listed in the official manifest"
@@ -162,15 +164,20 @@ jobs:
 
           $url = "https://storage.googleapis.com/flutter_infra_release/releases/$archivePath"
           $archive = Join-Path $env:RUNNER_TEMP 'flutter.zip'
-          Write-Host "Downloading $url"
-
           $downloaded = $false
+          if (-not $listed) {
+            Write-Host "The official manifest does not list $version for Windows; using the official git tag instead"
+          } else {
+            Write-Host "Downloading $url"
+          }
+          if ($listed) {
           try {
             Invoke-WebRequest -Uri $url -OutFile $archive -UseBasicParsing -MaximumRedirection 5
             $downloaded = (Test-Path $archive) -and ((Get-Item $archive).Length -gt 100MB)
             Write-Host "Archive size: $((Get-Item $archive).Length)"
           } catch {
             Write-Host "::warning::Invoke-WebRequest failed: $($_.Exception.Message)"
+          }
           }
 
           if (-not $downloaded) {
@@ -214,9 +221,17 @@ jobs:
       - name: Resolve the dependencies
         shell: pwsh
         run: flutter pub get
+      - name: Precache the Windows engine artifacts
+        shell: pwsh
+        run: flutter precache --windows
       - name: Build the Windows application
         shell: pwsh
-        run: flutter build windows --release
+        run: |
+          $ErrorActionPreference = 'Continue'
+          flutter build windows --release 2>&1 | Tee-Object -FilePath windows-build.log
+          $status = $LASTEXITCODE
+          python tools/ci_report.py log windows-build.log
+          exit $status
       - name: Package the complete distribution folder
         shell: pwsh
         run: |

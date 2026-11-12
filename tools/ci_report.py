@@ -22,6 +22,16 @@ def _clean(message: str) -> str:
     return text[:900]
 
 
+def detail(text: str) -> str:
+    """Keeps the interesting part of a Flutter test failure message."""
+    flat = " ".join(text.split())
+    marker = "relevant error-causing widget was:"
+    index = flat.find(marker)
+    if index >= 0:
+        return f"{flat[:280]} … {flat[index:index + 300]}"
+    return flat[:700]
+
+
 def emit(level: str, message: str) -> None:
     print(f"::{level}::{_clean(message)}")
 
@@ -113,18 +123,64 @@ def report_test(path: Path) -> int:
         emitted.add(key)
         if len(emitted) > MAX_ANNOTATIONS:
             break
-        emit("error", f"{name} :: {message}")
+        emit("error", f"{name} :: {detail(message)}")
 
     print(f"## tests: {total} finished, {len(failing)} failing")
     return 0
 
 
+ERROR_HINTS = (
+    "error",
+    "fatal",
+    "failed",
+    "exception",
+    "undefined reference",
+    "cannot open",
+    "not found",
+    "msbuild",
+    "cmake error",
+)
+
+
+def report_log(path: Path) -> int:
+    """Annotates the first error-looking lines of an arbitrary build log."""
+    if not path.exists():
+        emit("error", f"build log missing: {path}")
+        return 0
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    matched: list[str] = []
+    for raw in lines:
+        line = raw.strip()
+        lowered = line.lower()
+        if not line or len(line) < 6:
+            continue
+        if any(hint in lowered for hint in ERROR_HINTS):
+            matched.append(line)
+    seen: set[str] = set()
+    for line in matched:
+        if line in seen:
+            continue
+        seen.add(line)
+        if len(seen) > MAX_ANNOTATIONS:
+            break
+        emit("error", line)
+    if not matched:
+        tail = " | ".join(item.strip() for item in lines[-12:] if item.strip())
+        emit("error", f"no explicit error line found; tail: {tail}")
+    print(f"## build log: {len(lines)} lines, {len(matched)} error-like lines")
+    return 0
+
+
 def main(argv: list[str]) -> int:
-    if len(argv) != 3 or argv[1] not in {"analyze", "test"}:
-        print("usage: ci_report.py analyze|test <output-file>", file=sys.stderr)
+    if len(argv) != 3 or argv[1] not in {"analyze", "test", "log"}:
+        print("usage: ci_report.py analyze|test|log <output-file>", file=sys.stderr)
         return 2
     path = Path(argv[2])
-    return report_analyze(path) if argv[1] == "analyze" else report_test(path)
+    if argv[1] == "analyze":
+        return report_analyze(path)
+    if argv[1] == "test":
+        return report_test(path)
+    return report_log(path)
 
 
 if __name__ == "__main__":
