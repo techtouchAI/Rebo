@@ -142,21 +142,65 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $ProgressPreference = 'SilentlyContinue'
+          $version = $env:FLUTTER_VERSION
+          $manifestUrl = 'https://storage.googleapis.com/flutter_infra_release/releases/releases_windows.json'
+          $archivePath = "stable/windows/flutter_windows_$version-stable.zip"
           try {
-            $version = $env:FLUTTER_VERSION
-            $url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_${version}-stable.zip"
-            Write-Host "Downloading $url"
-            curl.exe -fL --retry 3 --retry-delay 5 -o "$env:RUNNER_TEMP\flutter.zip" $url
-            Write-Host "Extracting the SDK"
-            Expand-Archive -Path "$env:RUNNER_TEMP\flutter.zip" -DestinationPath "C:\" -Force
-            if (-not (Test-Path "C:\flutter\bin\flutter.bat")) {
-              throw "Flutter SDK was not extracted to C:\flutter"
+            $manifest = Invoke-RestMethod -Uri $manifestUrl -UseBasicParsing
+            $release = $manifest.releases |
+              Where-Object { $_.version -eq $version -and $_.channel -eq 'stable' } |
+              Select-Object -First 1
+            if ($release) {
+              $archivePath = $release.archive
+              Write-Host "Manifest archive: $archivePath"
+            } else {
+              Write-Host "::warning::version $version not listed in the official manifest"
             }
-            Get-Item "C:\flutter\bin\flutter.bat" | Select-Object FullName, Length | Format-List | Out-String | Write-Host
           } catch {
-            Write-Host "::error::Flutter SDK installation failed: $($_.Exception.Message)"
-            throw
+            Write-Host "::warning::could not read the release manifest: $($_.Exception.Message)"
           }
+
+          $url = "https://storage.googleapis.com/flutter_infra_release/releases/$archivePath"
+          $archive = Join-Path $env:RUNNER_TEMP 'flutter.zip'
+          Write-Host "Downloading $url"
+
+          $downloaded = $false
+          try {
+            Invoke-WebRequest -Uri $url -OutFile $archive -UseBasicParsing -MaximumRedirection 5
+            $downloaded = (Test-Path $archive) -and ((Get-Item $archive).Length -gt 100MB)
+            Write-Host "Archive size: $((Get-Item $archive).Length)"
+          } catch {
+            Write-Host "::warning::Invoke-WebRequest failed: $($_.Exception.Message)"
+          }
+
+          if (-not $downloaded) {
+            Write-Host "Falling back to curl.exe"
+            curl.exe -fL --retry 3 --retry-delay 5 --retry-all-errors -o $archive $url
+            Write-Host "curl exit code: $LASTEXITCODE"
+            if (Test-Path $archive) {
+              Write-Host "Archive size after curl: $((Get-Item $archive).Length)"
+              $downloaded = (Get-Item $archive).Length -gt 100MB
+            }
+          }
+
+          if (-not $downloaded) {
+            Write-Host "::warning::both download methods failed, falling back to a shallow git checkout"
+            if (Test-Path 'C:\flutter') { Remove-Item -Recurse -Force 'C:\flutter' }
+            git clone --depth 1 --branch $version https://github.com/flutter/flutter.git C:\flutter
+            if (-not (Test-Path 'C:\flutter\bin\internal\engine.version')) {
+              Write-Host "::error::the git fallback did not produce a Flutter checkout"
+              throw 'Flutter SDK unavailable'
+            }
+          } else {
+            Expand-Archive -Path $archive -DestinationPath 'C:\' -Force
+          }
+
+          if (-not (Test-Path 'C:\flutter\bin\flutter.bat')) {
+            Write-Host "::error::the Flutter SDK is missing at C:\flutter"
+            throw 'Flutter SDK layout unexpected'
+          }
+          Write-Host "::notice::Flutter SDK ready at C:\flutter"
+
       - name: Put Flutter on the PATH
         shell: pwsh
         run: |
@@ -167,19 +211,21 @@ jobs:
         run: |
           flutter config --enable-windows-desktop
           flutter --version
+      - name: Resolve the dependencies
+        shell: pwsh
+        run: flutter pub get
       - name: Build the Windows application
         shell: pwsh
         run: flutter build windows --release
       - name: Package the complete distribution folder
         shell: pwsh
         run: |
-          $out = "build\windows\x64\runner\Release"
+          $out = 'build\windows\x64\runner\Release'
           if (-not (Test-Path $out)) { throw "Release folder missing: $out" }
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $zip = "dist\mirsam-$($env:GITHUB_SHA.Substring(0,7))-windows-x64.zip"
           Compress-Archive -Path "$out\*" -DestinationPath $zip -Force
           Get-ChildItem $out | Select-Object Name, Length | Format-Table | Out-String | Write-Host
-          Get-FileHash $zip -Algorithm SHA256 | Format-List | Out-String | Write-Host
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
           "$hash  $([System.IO.Path]::GetFileName($zip))" | Out-File -Encoding ascii dist\SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
