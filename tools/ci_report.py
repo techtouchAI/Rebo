@@ -57,10 +57,16 @@ def report_test(path: Path) -> int:
     if not path.exists():
         emit("error", f"test output missing: {path}")
         return 0
+
     names: dict[int, str] = {}
-    failures: list[tuple[str, str]] = []
+    messages: dict[int, list[str]] = {}
+    current: int | None = None
+    failing: list[int] = []
     total = 0
-    for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
+    errors: list[tuple[str, str]] = []
+
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    for raw in lines:
         raw = raw.strip()
         if not raw.startswith("{"):
             continue
@@ -69,30 +75,47 @@ def report_test(path: Path) -> int:
         except json.JSONDecodeError:
             continue
         kind = event.get("type")
+
         if kind == "testStart":
             test = event.get("test") or {}
-            names[event.get("testID", -1)] = str(test.get("name", "unnamed test"))
+            test_id = test.get("id")
+            if isinstance(test_id, int):
+                current = test_id
+                names[test_id] = str(test.get("name", "unnamed test"))
+                messages[test_id] = []
+        elif kind == "print" and current is not None:
+            messages.setdefault(current, []).append(str(event.get("message", "")))
         elif kind == "testDone":
             total += 1
             if event.get("result") in {"failure", "error"} and not event.get("hidden"):
-                name = names.get(event.get("testID", -1), "unnamed test")
-                failures.append((name, event.get("result", "failure")))
+                failing.append(int(event.get("testID", -1)))
         elif kind == "error":
             name = names.get(event.get("testID", -1), "unrelated error")
-            message = str(event.get("error", "")).strip()
-            if message:
-                failures.append((name, message.splitlines()[0]))
+            detail = " ".join(str(event.get("error", "")).split())
+            trace = str(event.get("stackTrace", "")).splitlines()
+            if detail:
+                errors.append((name, detail[:500]))
+            if trace:
+                errors.append((name, " at " + trace[0].strip()[:300]))
 
-    seen: set[str] = set()
-    for name, message in failures:
-        key = f"{name}|{message}"
-        if key in seen:
+    for test_id in failing:
+        name = names.get(test_id, "unnamed test")
+        body = messages.get(test_id, [])
+        highlight = [line for line in body if "EXCEPTION" in line or "was thrown" in line or "Unable to" in line]
+        detail = highlight[0] if highlight else next((line for line in body if line.strip()), "test failed")
+        errors.insert(0, (name, detail))
+
+    emitted: set[str] = set()
+    for name, message in errors:
+        key = f"{name}|{message}"[:200]
+        if key in emitted:
             continue
-        seen.add(key)
-        if len(seen) > MAX_ANNOTATIONS:
+        emitted.add(key)
+        if len(emitted) > MAX_ANNOTATIONS:
             break
-        emit("error", f"{name}: {message}")
-    print(f"## tests: {total} finished, {len(failures)} failing events")
+        emit("error", f"{name} :: {message}")
+
+    print(f"## tests: {total} finished, {len(failing)} failing")
     return 0
 
 
