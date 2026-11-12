@@ -125,10 +125,20 @@ def report_test(path: Path, status: int = 0) -> int:
             break
         emit("error", f"{name} :: {detail(message)}")
 
+    plain = [line.strip() for line in lines if line.strip() and not line.strip().startswith("{")]
+    widget_hits = [
+        line
+        for line in plain
+        if "error-causing widget" in line.lower()
+        or ("file:///" in line and ".dart:" in line and "test/" not in line)
+    ]
+    for line in widget_hits[:6]:
+        emit("error", line)
+
     print(f"## tests: {total} finished, {len(failing)} failing")
-    if status != 0 and not emitted:
-        raw_tail = " | ".join(line.strip() for line in lines[-14:] if line.strip() and not line.strip().startswith("{"))
-        emit("error", f"flutter test exited with {status} and reported no failing test; tail: {raw_tail}")
+    if status != 0 and not widget_hits:
+        raw_tail = " | ".join(plain[-16:])
+        emit("error", f"flutter test exited with {status}; last output: {raw_tail}")
     return 0
 
 
