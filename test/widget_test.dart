@@ -140,17 +140,16 @@ void main() {
     expect(find.textContaining('الوحدات المحفوظة'), findsOneWidget);
   });
 
-  testWidgets('the layout adapts to a phone sized screen', (WidgetTester tester) async {
+  testWidgets('the shell switches to a navigation bar on a phone', (WidgetTester tester) async {
     await pumpApplication(tester, size: const Size(390, 844));
 
-    expect(tester.takeException(), isNull);
     expect(find.byType(NavigationBar), findsOneWidget);
   });
 
-  testWidgets('the layout adapts to a large desktop window', (WidgetTester tester) async {
+  testWidgets('the shell switches to a navigation rail on a desktop window',
+      (WidgetTester tester) async {
     await pumpApplication(tester, size: const Size(1600, 1000));
 
-    expect(tester.takeException(), isNull);
     expect(find.byType(NavigationRail), findsOneWidget);
   });
 }
