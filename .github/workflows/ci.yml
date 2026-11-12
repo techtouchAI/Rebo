@@ -1,0 +1,162 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.35.0
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+
+jobs:
+  content:
+    name: Content fidelity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify the generated content against the source documents
+        run: python3 tools/verify_content.py
+      - name: Validate the JSON payloads
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          for path in sorted(pathlib.Path('assets/content').glob('*.json')):
+              with path.open(encoding='utf-8') as handle:
+                  data = json.load(handle)
+              print(f'{path}: ok ({len(data)} top level keys)')
+          PY
+
+  analyze:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore the Flutter SDK
+        id: sdk
+        uses: actions/cache@v4
+        with:
+          path: ~/flutter
+          key: flutter-sdk-linux-${{ env.FLUTTER_VERSION }}
+      - name: Install the official Flutter ${{ env.FLUTTER_VERSION }} SDK
+        if: steps.sdk.outputs.cache-hit != 'true'
+        run: |
+          curl -fL --retry 3 -o /tmp/flutter.tar.xz \
+            "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
+          tar xf /tmp/flutter.tar.xz -C "$HOME"
+      - name: Put Flutter on the PATH
+        run: |
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+          git config --global --add safe.directory "$HOME/flutter"
+      - name: Report the toolchain versions
+        run: |
+          flutter --version
+          dart --version
+      - name: Resolve the dependencies
+        run: flutter pub get
+      - name: Record the resolved dependency versions
+        run: |
+          cp pubspec.lock resolved-pubspec.lock
+      - uses: actions/upload-artifact@v4
+        with:
+          name: resolved-pubspec-lock
+          path: resolved-pubspec.lock
+          if-no-files-found: warn
+      - name: Static analysis
+        run: flutter analyze --no-fatal-infos
+      - name: Tests
+        run: flutter test --reporter expanded
+
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Restore the Flutter SDK
+        id: sdk
+        uses: actions/cache@v4
+        with:
+          path: ~/flutter
+          key: flutter-sdk-linux-${{ env.FLUTTER_VERSION }}
+      - name: Install the official Flutter ${{ env.FLUTTER_VERSION }} SDK
+        if: steps.sdk.outputs.cache-hit != 'true'
+        run: |
+          curl -fL --retry 3 -o /tmp/flutter.tar.xz \
+            "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
+          tar xf /tmp/flutter.tar.xz -C "$HOME"
+      - name: Put Flutter on the PATH
+        run: |
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+          git config --global --add safe.directory "$HOME/flutter"
+      - name: Build the release APK
+        run: flutter build apk --release
+      - name: Copy the artifacts
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/mirsam-${GITHUB_SHA::7}.apk"
+          sha256sum dist/*.apk > dist/SHA256SUMS.txt
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mirsam-android-apk
+          path: dist
+
+  windows:
+    name: Windows EXE
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore the Flutter SDK
+        id: sdk
+        uses: actions/cache@v4
+        with:
+          path: C:\flutter
+          key: flutter-sdk-windows-${{ env.FLUTTER_VERSION }}
+      - name: Install the official Flutter ${{ env.FLUTTER_VERSION }} SDK
+        if: steps.sdk.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_$env:FLUTTER_VERSION-stable.zip"
+          Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\flutter.zip"
+          Expand-Archive -Path "$env:RUNNER_TEMP\flutter.zip" -DestinationPath "C:\" -Force
+      - name: Put Flutter on the PATH
+        shell: pwsh
+        run: |
+          echo "C:\flutter\bin" >> $env:GITHUB_PATH
+          git config --global --add safe.directory C:/flutter
+      - name: Enable the Windows desktop target
+        shell: pwsh
+        run: |
+          flutter config --enable-windows-desktop
+          flutter --version
+      - name: Build the Windows application
+        shell: pwsh
+        run: flutter build windows --release
+      - name: Package the complete distribution folder
+        shell: pwsh
+        run: |
+          $out = "build\windows\x64\runner\Release"
+          if (-not (Test-Path $out)) { throw "Release folder missing: $out" }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $zip = "dist\mirsam-$($env:GITHUB_SHA.Substring(0,7))-windows-x64.zip"
+          Compress-Archive -Path "$out\*" -DestinationPath $zip -Force
+          Get-ChildItem $out | Select-Object Name, Length | Format-Table | Out-String | Write-Host
+          Get-FileHash $zip -Algorithm SHA256 | Format-List | Out-String | Write-Host
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $([System.IO.Path]::GetFileName($zip))" | Out-File -Encoding ascii dist\SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mirsam-windows-x64
+          path: dist

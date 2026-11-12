@@ -1,0 +1,18 @@
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.iml
+.idea/
+.vscode/
+
+# Local build artefacts & secrets
+android/key.properties
+android/local.properties
+*.jks
+*.keystore
+*.p12
+build/preview/
+coverage/

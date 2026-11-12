@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520">
+  <rect x="120" y="70" width="500" height="370" rx="10" fill="none" stroke="#3A3A44" stroke-width="16"/>
+  <g stroke="#1E5F74" stroke-width="5" opacity="0.85">
+    <line x1="160" y1="90" x2="160" y2="420"/>
+    <line x1="192" y1="90" x2="192" y2="420"/>
+    <line x1="224" y1="90" x2="224" y2="420"/>
+    <line x1="256" y1="90" x2="256" y2="420"/>
+    <line x1="288" y1="90" x2="288" y2="420"/>
+    <line x1="320" y1="90" x2="320" y2="420"/>
+    <line x1="352" y1="90" x2="352" y2="420"/>
+    <line x1="384" y1="90" x2="384" y2="420"/>
+    <line x1="416" y1="90" x2="416" y2="420"/>
+    <line x1="448" y1="90" x2="448" y2="420"/>
+    <line x1="480" y1="90" x2="480" y2="420"/>
+    <line x1="512" y1="90" x2="512" y2="420"/>
+    <line x1="544" y1="90" x2="544" y2="420"/>
+    <line x1="576" y1="90" x2="576" y2="420"/>
+  </g>
+  <rect x="150" y="140" width="436" height="34" fill="#B4462F"/>
+  <rect x="150" y="216" width="436" height="34" fill="#B4462F"/>
+  <rect x="150" y="292" width="436" height="34" fill="#B4462F"/>
+  <rect x="150" y="368" width="436" height="34" fill="#B4462F" opacity="0.85"/>
+  <rect x="120" y="60" width="500" height="26" rx="8" fill="#D9A34A"/>
+  <rect x="120" y="424" width="500" height="26" rx="8" fill="#D9A34A"/>
+  <polygon points="470,238 560,254 560,284 470,300 430,268" fill="#4E7C59"/>
+  <ellipse cx="470" cy="268" rx="10" ry="32" fill="#3A3A44" opacity="0.2"/>
+  <circle cx="668" cy="150" r="24" fill="#D9A34A"/>
+  <path d="M648 108 C676 112 692 128 696 150" fill="none" stroke="#D9A34A" stroke-width="6"/>
+  <ellipse cx="380" cy="480" rx="270" ry="14" fill="#3A3A44" opacity="0.1"/>
+</svg>
