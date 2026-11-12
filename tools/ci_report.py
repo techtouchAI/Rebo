@@ -28,7 +28,11 @@ def detail(text: str) -> str:
     marker = "relevant error-causing widget was:"
     index = flat.find(marker)
     if index >= 0:
-        return f"{flat[:280]} … {flat[index:index + 300]}"
+        return flat[index:index + 600]
+    marker = "A RenderFlex overflowed"
+    index = flat.find(marker)
+    if index >= 0:
+        return flat[index:index + 600]
     return flat[:700]
 
 
