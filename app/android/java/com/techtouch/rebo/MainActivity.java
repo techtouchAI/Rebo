@@ -48,7 +48,13 @@ public class MainActivity extends Activity {
         s.setLoadWithOverviewMode(true);
         s.setSupportZoom(false);
         s.setBuiltInZoomControls(false);
+        /* keep the app at 100% regardless of the system font scale: the reader
+           has its own font-size control, and a 1.3× system scale reflows the
+           Arabic layout badly inside WebView */
         s.setTextZoom(100);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            s.setLayoutAlgorithm(WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING);
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         }
@@ -83,6 +89,11 @@ public class MainActivity extends Activity {
             }
         });
 
+        /* respect the status bar by colouring it instead of overlaying content */
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            getWindow().setStatusBarColor(Color.parseColor("#0d1016"));
+            getWindow().setNavigationBarColor(Color.parseColor("#0d1016"));
+        }
         setContentView(web);
         web.loadUrl("file:///android_asset/www/index.html");
     }
