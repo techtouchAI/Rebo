@@ -84,7 +84,7 @@ jobs:
           set +e
           flutter test --reporter json > "$RUNNER_TEMP/tests.json" 2>&1
           status=$?
-          python3 tools/ci_report.py test "$RUNNER_TEMP/tests.json"
+          python3 tools/ci_report.py test "$RUNNER_TEMP/tests.json" "$status"
           exit $status
 
   android:
@@ -127,7 +127,7 @@ jobs:
 
   windows:
     name: Windows EXE
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - name: Restore the Flutter SDK

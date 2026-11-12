@@ -63,7 +63,7 @@ def report_analyze(path: Path) -> int:
     return 0
 
 
-def report_test(path: Path) -> int:
+def report_test(path: Path, status: int = 0) -> int:
     if not path.exists():
         emit("error", f"test output missing: {path}")
         return 0
@@ -126,6 +126,9 @@ def report_test(path: Path) -> int:
         emit("error", f"{name} :: {detail(message)}")
 
     print(f"## tests: {total} finished, {len(failing)} failing")
+    if status != 0 and not emitted:
+        raw_tail = " | ".join(line.strip() for line in lines[-14:] if line.strip() and not line.strip().startswith("{"))
+        emit("error", f"flutter test exited with {status} and reported no failing test; tail: {raw_tail}")
     return 0
 
 
@@ -179,14 +182,15 @@ def report_log(path: Path) -> int:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 3 or argv[1] not in {"analyze", "test", "log"}:
-        print("usage: ci_report.py analyze|test|log <output-file>", file=sys.stderr)
+    if len(argv) < 3 or argv[1] not in {"analyze", "test", "log"}:
+        print("usage: ci_report.py analyze|test|log <output-file> [exit-status]", file=sys.stderr)
         return 2
+    status = int(argv[3]) if len(argv) > 3 else 0
     path = Path(argv[2])
     if argv[1] == "analyze":
         return report_analyze(path)
     if argv[1] == "test":
-        return report_test(path)
+        return report_test(path, status)
     return report_log(path)
 
 
