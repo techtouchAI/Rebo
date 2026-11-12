@@ -101,10 +101,10 @@ def report_test(path: Path, status: int = 0) -> int:
                 failing.append(int(event.get("testID", -1)))
         elif kind == "error":
             name = names.get(event.get("testID", -1), "unrelated error")
-            detail = " ".join(str(event.get("error", "")).split())
+            message = " ".join(str(event.get("error", "")).split())
             trace = str(event.get("stackTrace", "")).splitlines()
-            if detail:
-                errors.append((name, detail[:500]))
+            if message:
+                errors.append((name, message[:500]))
             if trace:
                 errors.append((name, " at " + trace[0].strip()[:300]))
 
@@ -112,8 +112,8 @@ def report_test(path: Path, status: int = 0) -> int:
         name = names.get(test_id, "unnamed test")
         body = messages.get(test_id, [])
         highlight = [line for line in body if "EXCEPTION" in line or "was thrown" in line or "Unable to" in line]
-        detail = highlight[0] if highlight else next((line for line in body if line.strip()), "test failed")
-        errors.insert(0, (name, detail))
+        first_line = highlight[0] if highlight else next((line for line in body if line.strip()), "test failed")
+        errors.insert(0, (name, first_line))
 
     emitted: set[str] = set()
     for name, message in errors:
