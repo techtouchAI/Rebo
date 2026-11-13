@@ -143,6 +143,9 @@ jobs:
     # Either a rebo-v* tag, or a manual run with the publish box ticked.
     if: startsWith(github.ref, 'refs/tags/rebo-v') || (github.event_name == 'workflow_dispatch' && inputs.publish)
     steps:
+      # Needed to read package.json for the version (and for the tag name).
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artefacts
