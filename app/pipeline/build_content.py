@@ -128,10 +128,14 @@ def split_plates(raw_bytes, out_dir, prefix, ext):
         import io
         from PIL import Image
     except ImportError:
-        name = prefix + '_1' + ext
-        with open(os.path.join(out_dir, name), 'wb') as f:
-            f.write(raw_bytes)
-        return [name]
+        # Without Pillow the stacked scans cannot be split. Fail loudly instead
+        # of silently shipping a different (and worse) set of plates: the
+        # generated media is a build input, not a best-effort cache.
+        raise SystemExit(
+            'Pillow is required to split the guide plates.\n'
+            '  pip install Pillow\n'
+            'or point PYTHONPATH at an existing installation, e.g.\n'
+            '  PYTHONPATH=/tmp/pil python3 app/pipeline/build_content.py')
 
     im = Image.open(io.BytesIO(raw_bytes)).convert('RGB')
     g = im.convert('L')
@@ -210,6 +214,30 @@ def chunk_paragraphs(lines, target=420):
     if buf:
         out.append(buf.strip())
     return [p for p in out if len(p) > 2]
+
+
+CHOICE_MARK = re.compile(r'(?:^|(?<=\s))([أبج])\)\s*')
+
+
+def split_mcq_body(text):
+    """Split a multiple-choice paragraph into (stem, [choices]).
+
+    The docx stores each choice on its own line, and long choices wrap, so the
+    split must happen on the letter markers rather than on line breaks.
+    """
+    text = text.replace('\u200b', '').strip()
+    marks = list(CHOICE_MARK.finditer(text))
+    if not marks:
+        return text.strip(), []
+    stem = text[:marks[0].start()].strip()
+    choices = []
+    for i, mark in enumerate(marks):
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(text)
+        choice = re.sub(r'\s+', ' ', text[mark.end():end]).strip()
+        choice = choice.rstrip('،, ')
+        if choice:
+            choices.append(choice)
+    return stem, choices
 
 
 def split_objectives(txt):
@@ -336,22 +364,26 @@ def parse_unit(prefix, root_dir):
             if mode == 'sum' and t.startswith('•'):
                 unit['summary'].append(t.lstrip('• ').strip())
             elif mode == 'mcq':
-                m = re.match(r'^(\d+)\.\s*(.*)', t)
+                # Choices are separated by hard line breaks in the source docx,
+                # and a stem can wrap across lines too.
+                m = re.match(r'^(\d+)\.\s*(.*)', t, re.S)
                 if m:
                     q = {'n': int(m.group(1)), 'q': '', 'options': [], 'answer': None}
                     unit['mcq'].append(q)
-                    chunks = re.split(r'\s(?=[أبج]\)\s)', m.group(2))
-                    q['q'] = chunks[0].strip()
-                    q['options'] += [re.sub(r'^[أبج]\)\s*', '', c).strip() for c in chunks[1:]]
+                    stem, found = split_mcq_body(m.group(2))
+                    q['q'] = stem
+                    q['options'].extend(found)
                 elif unit['mcq']:
                     q = unit['mcq'][-1]
-                    for c in re.split(r'\s(?=[أبج]\)\s)', t):
-                        c2 = re.sub(r'^[أبج]\)\s*', '', c).strip()
-                        if c2:
-                            if len(q['options']) < 3:
-                                q['options'].append(c2)
-                            else:
-                                q['q'] += ' ' + c2
+                    stem, found = split_mcq_body(t)
+                    if found:
+                        q['options'].extend(found)
+                    elif stem and len(q['options']) < 3:
+                        # continuation of the last choice
+                        if q['options']:
+                            q['options'][-1] = (q['options'][-1] + ' ' + stem).strip()
+                        else:
+                            q['q'] = (q['q'] + ' ' + stem).strip()
             elif mode == 'tf':
                 m = re.match(r'^(\d+)\.\s*(.*)', t)
                 if m:
@@ -639,6 +671,13 @@ def main():
         os.path.join(os.path.dirname(__file__), '..', '..')))
     args = ap.parse_args()
     root_dir = os.path.abspath(args.repo)
+
+    try:
+        import PIL  # noqa: F401  (imported again inside split_plates)
+    except ImportError:
+        raise SystemExit(
+            'Pillow is required by the content pipeline.\n'
+            '  pip install Pillow')
 
     global OUT_MEDIA
     out_www = os.path.join(root_dir, 'app', 'www')

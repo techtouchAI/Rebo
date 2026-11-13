@@ -2,6 +2,10 @@
 
 1 ICON "rebo.ico"
 
+// Application manifest: DPI awareness (per-monitor v2) and Common Controls v6.
+// Resource id 1 + type 24 (RT_MANIFEST) is what the Windows loader looks for.
+1 24 "manifest.xml"
+
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION 1,0,0,0
 PRODUCTVERSION 1,0,0,0
@@ -31,4 +35,3 @@ BEGIN
     END
 END
 
-1 RCDATA "rebo.ico"

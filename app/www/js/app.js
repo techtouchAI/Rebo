@@ -62,7 +62,9 @@
   window.ReboNav = {
     canBack: function () { return depth > 0; },
     back: function () { history.back(); },
-    version: '1.0.0'
+    get version() {
+      return (window.REBO_VERSION && window.REBO_VERSION.version) || '0.0.0';
+    }
   };
   function go(name, params, opts) {
     params = params || {};
@@ -895,11 +897,25 @@
   }
 
   /* ---------------- render ---------------- */
+  /* A bad URL (or a corrupt data file) must never leave a blank screen: any
+     exception inside a view is caught and replaced with a recoverable panel. */
+  function errorView(err) {
+    return '<div class="empty" style="text-align:center;padding:40px 20px">' +
+      '<div class="eyebrow">حدث خطأ غير متوقع</div>' +
+      '<h2 style="font-size:19px;margin:10px 0 6px">تعذّر عرض هذه الصفحة</h2>' +
+      '<p style="font-size:13px;color:var(--text-mute);margin-bottom:18px">' +
+      'جرّب العودة إلى الصفحة الرئيسية أو الفهرس.</p>' +
+      '<div class="hero-actions" style="justify-content:center">' +
+      '<button class="btn" data-go="home">الصفحة الرئيسية</button>' +
+      '<button class="btn ghost" data-go="index">الفهرس</button></div></div>';
+  }
+
   function render(name, params) {
     params = params || {};
     current = { name: name, params: params };
     var view = $('#view');
     var html = '';
+    try {
     switch (name) {
       case 'home': html = viewHome(); break;
       case 'index': html = viewIndex(); break;
@@ -912,6 +928,10 @@
       case 'quiz': html = viewQuiz(params); break;
       case 'result': html = viewResult(); break;
       default: html = viewHome();
+    }
+    } catch (err) {
+      if (window.console) console.error('[rebo] view failed:', name, err);
+      html = errorView(err);
     }
     view.innerHTML = html;
     view.scrollTop = 0;
@@ -1014,15 +1034,22 @@
   });
 
   /* drawer */
+  var drawerReturnFocus = null;
   function openDrawer() {
+    drawerReturnFocus = document.activeElement;
     $('#drawer').classList.add('open');
     $('#scrim').classList.add('open');
     $('#drawer').setAttribute('aria-hidden', 'false');
+    var first = $('#drawerNav button');
+    if (first) first.focus();
   }
   function closeDrawer() {
+    if (!$('#drawer').classList.contains('open')) return;
     $('#drawer').classList.remove('open');
     $('#scrim').classList.remove('open');
     $('#drawer').setAttribute('aria-hidden', 'true');
+    if (drawerReturnFocus && drawerReturnFocus.focus) drawerReturnFocus.focus();
+    drawerReturnFocus = null;
   }
   $('#menuBtn').addEventListener('click', openDrawer);
   $('#scrim').addEventListener('click', closeDrawer);
@@ -1030,10 +1057,16 @@
   /* search */
   function openSearch() {
     $('#searchPanel').hidden = false;
-    setTimeout(function () { $('#searchInput').focus(); }, 60);
+    $('#searchBtn').setAttribute('aria-expanded', 'true');
+    setTimeout(function () { $('#searchInput').select(); }, 60);
     doSearch($('#searchInput').value || '');
   }
-  function hideSearch() { $('#searchPanel').hidden = true; }
+  function hideSearch() {
+    if ($('#searchPanel').hidden) return;
+    $('#searchPanel').hidden = true;
+    $('#searchBtn').setAttribute('aria-expanded', 'false');
+    $('#searchBtn').focus();
+  }
   $('#searchBtn').addEventListener('click', openSearch);
   $('#searchClose').addEventListener('click', hideSearch);
   $('#searchInput').addEventListener('input', function (e) { doSearch(e.target.value); });
@@ -1049,13 +1082,6 @@
       (d.documentElement.requestFullscreen || function () {}).call(d.documentElement);
     } else {
       (d.exitFullscreen || function () {}).call(d);
-    }
-  });
-
-  /* android back button (WebView2/Android hardware back) */
-  window.addEventListener('keydown', function (e) {
-    if (e.key === 'Backspace' && !/input|textarea/i.test(document.activeElement.tagName)) {
-      /* no-op, handled natively */
     }
   });
 

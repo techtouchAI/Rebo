@@ -156,9 +156,9 @@ GetAvailableCoreWebView2BrowserVersionString(PCWSTR browser_executable_folder,
   return HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
 }
 
-extern "C" __declspec(dllexport) HRESULT WINAPI DllCanUnloadNow(void) {
-  return S_FALSE;
-}
+// combaseapi.h already declares this with __declspec(dllexport), so the
+// attribute is inherited from the declaration in the .def/.exp step.
+extern "C" HRESULT WINAPI DllCanUnloadNow(void) { return S_FALSE; }
 
 BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID) {
   if (reason == DLL_PROCESS_ATTACH) {

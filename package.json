@@ -1,0 +1,14 @@
+{
+  "name": "rebo-art-education",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ريبو — دليل التربية الفنية للمرحلة المتوسطة (أندرويد + ويندوز)",
+  "scripts": {
+    "content": "python3 app/pipeline/build_content.py",
+    "version-sync": "python3 tools/sync-version.py",
+    "android": "bash build-android.sh",
+    "windows": "bash build-windows.sh",
+    "build": "bash build-all.sh",
+    "test": "python3 tools/check.py"
+  }
+}

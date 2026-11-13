@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Write dist/SHA256SUMS.txt for every release artefact."""
 import hashlib
+import json
 import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, 'dist')
-TARGETS = [
-    'rebo-android-v1.0.0.apk',
-    'Rebo-Setup-1.0.0.exe',
-    'Rebo-Windows-1.0.0-portable.zip',
-]
+def targets(version: str) -> list[str]:
+    return [
+        'rebo-android-v%s.apk' % version,
+        'Rebo-Setup-%s.exe' % version,
+        'Rebo-Windows-%s-portable.zip' % version,
+    ]
 
 
 def sha256(path):
@@ -21,8 +23,10 @@ def sha256(path):
 
 
 def main():
+    with open(os.path.join(ROOT, 'package.json'), encoding='utf8') as fh:
+        version = json.load(fh)['version']
     lines = []
-    for name in TARGETS:
+    for name in targets(version):
         p = os.path.join(DIST, name)
         if not os.path.exists(p):
             continue

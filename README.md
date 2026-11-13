@@ -48,6 +48,37 @@ build-all.sh        الاثنان معًا
 dist/               المخرجات الجاهزة
 ```
 
+## بوابات الجودة
+
+```bash
+python3 tools/check.py          # يفحص: الإصدار، المحتوى، الأصول، JS، APK، EXE
+```
+
+كل بناء يتحقق من مخرجاته بنفسه؛ لا يُعلن النجاح إلا بعد اجتياز:
+
+| البوابة | ما تتحقق منه |
+|---|---|
+| `sync-version --check` | كل ذكر للإصدار مطابق لـ `package.json` |
+| `check.py: content` | ١٣ وحدة، ٥٥ موضوعًا، ٧٦ سؤالًا بمفاتيح إجابة، ١٩ لوحة، ٩ خطط |
+| `check.py: assets` | كل ملف يشير إليه HTML/CSS/data.js موجود فعلًا |
+| `check.py: javascript` | `node --check` على كل ملفات JS |
+| `build-android` | zipalign ٤ بايت + توقيع v2/v3 مؤكَّد + badging مطابق للإصدار |
+| `build-windows` | PE 64-bit GUI + manifest (DPI/Common Controls) + أيقونة + نسخة + حمولة |
+| `verify-pe --expect-zip` | قارئ الحمولة في المثبّت يعيد نفس البايتات التي يراها قارئ zip |
+
+## بناء قابل للتكرار (Reproducible build)
+
+البناء حتمي: نفس المصادر + نفس قيمة `SOURCE_DATE_EPOCH` ⇒ **ملف APK مطابق بايتًا
+ببايت**. تحقّقنا من ذلك بتوقيعين متتاليين متطابقين في البصمة.
+
+```bash
+SOURCE_DATE_EPOCH=1767225600 bash build-android.sh
+sha256sum dist/rebo-android-v1.0.0.apk   # نفس البصمة في كل تشغيل
+```
+
+هذا يجعل التحقق من المخرجات ممكنًا لأي طرف ثالث، ويجعل `dist/SHA256SUMS.txt`
+قابلًا للمقارنة.
+
 ## إعادة البناء
 
 ### 1. المحتوى (اختياري — المخرجات محفوظة في المستودع)

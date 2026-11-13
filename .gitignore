@@ -1,6 +1,8 @@
 # build scratch
 build/
 *.o
+__pycache__/
+*.pyc
 *.pdb
 *.log
 

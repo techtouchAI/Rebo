@@ -1,6 +1,9 @@
 #include <winver.h>
 
-1 ICON "../res/rebo.ico"
+1 ICON "rebo.ico"
+
+// Application manifest (DPI awareness + Common Controls v6).
+1 24 "setup.manifest.xml"
 100 RCDATA "payload.zip"
 
 VS_VERSION_INFO VERSIONINFO
@@ -17,7 +20,7 @@ BEGIN
         BLOCK "040104b0"
         BEGIN
             VALUE "CompanyName",      "TechTouch AI"
-            VALUE "FileDescription",  "Rebo — Art Education (Middle School) Setup"
+            VALUE "FileDescription",  "Rebo - Art Education (Middle School) Setup"
             VALUE "FileVersion",      "1.0.0.0"
             VALUE "InternalName",     "ReboSetup"
             VALUE "LegalCopyright",   "(c) 2026 TechTouch AI"
