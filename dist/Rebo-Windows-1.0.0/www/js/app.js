@@ -51,8 +51,136 @@
     clearTimeout(toast._t);
     toast._t = setTimeout(function () { t.classList.remove('show'); }, 1900);
   }
+  /* ---------------- grade scope (first-run choice) ----------------
+     The learner picks exactly one grade; from then on the app only ever shows
+     content for that grade. The choice is stored and can be changed from
+     الإعدادات or from the grade chip in the header. */
+  var CHOOSABLE = ['الصف الأول المتوسط', 'الصف الثاني المتوسط', 'الصف الثالث المتوسط'];
+  function activeGrade() {
+    var g = store.get('grade', null);
+    return CHOOSABLE.indexOf(g) >= 0 ? g : null;
+  }
+  /* The general middle-stage unit (المرحلة المتوسطة) belongs to no single
+     grade, so it accompanies every grade instead of being hidden. */
+  var SHARED_GRADE = 'المرحلة المتوسطة';
+  function unitsForGrade(g) {
+    if (!g) return [];
+    return C.units.filter(function (u) { return u.grade === g || u.grade === SHARED_GRADE; });
+  }
+  function scopedUnits() {
+    return unitsForGrade(activeGrade());
+  }
+  /* Units whose grade matches a unit — used to keep "الوحدات الأخرى" local. */
+  function gradeUnitsOf(unit) {
+    return C.units.filter(function (u) { return u.grade === unit.grade; });
+  }
+  /* The lesson plans in the guide are written for الصف الأول المتوسط; when a
+     learner in another grade is active we still show them, because the skills
+     they teach are shared, but we label them as such rather than pretending. */
+  function scopePlans() {
+    var g = activeGrade();
+    if (!g) return [];
+    return C.plans.filter(function (p) {
+      return String(p.grade || '').indexOf(gmeta(g).short) >= 0 || !p.grade;
+    });
+  }
+  function unitById(id) {
+    return C.units.filter(function (u) { return u.id === id; })[0] || null;
+  }
+  /* True when the current unit actually belongs to the chosen grade. */
+  function unitAllowed(unit) {
+    var g = activeGrade();
+    return !g || (unit && (unit.grade === g || unit.grade === SHARED_GRADE));
+  }
+  function setGrade(g) {
+    if (CHOOSABLE.indexOf(g) < 0) return;
+    store.set('grade', g);
+    /* the URL must not keep pointing at the chooser (or at a page that
+       belonged to the previous grade) */
+    history.replaceState({}, '', '#home');
+    depth = 0;
+    render('home', {});
+    buildDrawerNav();
+    syncShellCounts();
+    toast('تم اختيار الصف ' + gmeta(g).short + ' المتوسط');
+  }
+  function syncShellCounts() {
+    $('#statUnits').textContent = arDigit(scopedUnits().length);
+    $('#statPlans').textContent = arDigit(scopePlans().length);
+    $('#statQ').textContent = arDigit(scopedQuestions());
+  }
+  function clearGrade() {
+    store.set('grade', null);
+    depth = 0;
+    history.replaceState({}, '', '#home');
+    render('gradeGate', {});
+    buildDrawerNav();
+    syncShellCounts();
+  }
+
+  function syncGradeChip() {
+    var chip = $('#gradeChip');
+    if (!chip) return;
+    var g = activeGrade();
+    chip.querySelector('.gc-txt').textContent = g ? 'الصف ' + gmeta(g).short : 'اختر الصف';
+    chip.classList.toggle('unset', !g);
+    chip.setAttribute('aria-label', g ? 'الصف الحالي: ' + g + ' — اضغط للتغيير' : 'اختيار الصف');
+  }
+
+  /* ---------------- reading scale (all pages) ---------------- */
+  var FS_LEVELS = ['s', 'm', 'l', 'xl'];
+  var FS_LABELS = { s: 'صغير', m: 'عادي', l: 'كبير', xl: 'أكبر' };
+  function applyFontScale() {
+    var fs = store.get('fs', 'm');
+    if (FS_LEVELS.indexOf(fs) < 0) fs = 'm';
+    document.documentElement.setAttribute('data-fs', fs);
+    return fs;
+  }
+  function setFontScale(fs) {
+    if (FS_LEVELS.indexOf(fs) < 0) return;
+    store.set('fs', fs);
+    applyFontScale();
+    syncFontBars();
+  }
+  function syncFontBars() {
+    var fs = store.get('fs', 'm');
+    $$('.fontbar').forEach(function (bar) {
+      $$('button[data-fs]', bar).forEach(function (b) {
+        b.classList.toggle('on', b.dataset.fs === fs);
+      });
+      var i = FS_LEVELS.indexOf(fs);
+      var dec = $('button[data-fs-step="-1"]', bar);
+      var inc = $('button[data-fs-step="1"]', bar);
+      if (dec) dec.disabled = i <= 0;
+      if (inc) inc.disabled = i >= FS_LEVELS.length - 1;
+    });
+  }
+  /* The bar is injected at the top of every view by render(). */
+  function fontBar() {
+    var fs = store.get('fs', 'm');
+    var i = FS_LEVELS.indexOf(fs);
+    return '<div class="fontbar" role="group" aria-label="حجم الخط">' +
+      '<span class="fb-label">حجم الخط</span>' +
+      '<span class="fb-btns">' +
+        '<button type="button" data-fs-step="-1" aria-label="تصغير الخط"' +
+          (i <= 0 ? ' disabled' : '') + '>أ−</button>' +
+        '<button type="button" class="fb-a' + (fs === 's' ? ' on' : '') + '" data-fs="s" aria-label="حجم صغير">أ</button>' +
+        '<button type="button" class="fb-b' + (fs === 'm' ? ' on' : '') + '" data-fs="m" aria-label="حجم عادي">أ</button>' +
+        '<button type="button" class="fb-c' + (fs === 'l' ? ' on' : '') + '" data-fs="l" aria-label="حجم كبير">أ</button>' +
+        '<button type="button" class="fb-d' + (fs === 'xl' ? ' on' : '') + '" data-fs="xl" aria-label="حجم أكبر">أ</button>' +
+        '<button type="button" data-fs-step="1" aria-label="تكبير الخط"' +
+          (i >= FS_LEVELS.length - 1 ? ' disabled' : '') + '>أ+</button>' +
+      '</span>' +
+      '<span class="fb-spacer"></span>' +
+      '<span class="fb-status" aria-live="polite">' + FS_LABELS[fs] + '</span>' +
+      '</div>';
+  }
+
   function totalQuestions() {
     return C.units.reduce(function (a, u) { return a + u.mcq.length + u.truefalse.length; }, 0);
+  }
+  function scopedQuestions() {
+    return scopedUnits().reduce(function (a, u) { return a + u.mcq.length + u.truefalse.length; }, 0);
   }
 
   /* ---------------- routing ---------------- */
@@ -105,6 +233,8 @@
     plans: 'خطط الدروس',
     plan: 'خطة الدرس',
     quiz: 'اختبر نفسك',
+    settings: 'الإعدادات',
+    gradeGate: 'اختيار الصف',
     studio: 'المختبر الفني',
     about: 'عن التطبيق',
     intro: 'المقدمة'
@@ -147,110 +277,201 @@
       '</svg>';
   }
 
+  /* ---------------- first-run: choose the grade ---------------- */
+  function viewGradeGate() {
+    var html = '<div class="gate">' +
+      '<div class="gate-in">' +
+        '<svg class="gate-art" viewBox="0 0 200 200" aria-hidden="true">' +
+          '<circle cx="100" cy="100" r="82" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="1"/>' +
+          '<circle cx="100" cy="100" r="58" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="1"/>' +
+          '<path d="M100 26 L174 100 L100 174 L26 100 Z" fill="none" stroke="rgba(122,214,192,.35)" stroke-width="1.5"/>' +
+          '<circle cx="100" cy="100" r="9" fill="#e8c07d"/>' +
+        '</svg>' +
+        '<span class="eyebrow">ريبو · التربية الفنية</span>' +
+        '<h1 class="gate-title">أيُّ صفٍّ تدرس؟</h1>' +
+        '<p class="gate-sub">اختر صفّك مرة واحدة، وسيقتصر التطبيق على وحدات صفّك وخططه وأسئلته. يمكنك التغيير لاحقًا من الإعدادات.</p>' +
+        '<div class="gate-options">';
+
+    CHOOSABLE.forEach(function (g, i) {
+      var units = unitsForGrade(g);
+      var m = gmeta(g);
+      var questions = units.reduce(function (a, u) { return a + u.mcq.length + u.truefalse.length; }, 0);
+      var topics = units.reduce(function (a, u) { return a + u.sections.length; }, 0);
+      html += '<button type="button" class="gate-card" data-pick-grade="' + esc(g) + '" ' +
+        'style="--tone:' + m.color + '">' +
+        '<span class="g-num">' + arDigit(i + 1) + '</span>' +
+        '<span class="gc-body">' +
+          '<b>الصف ' + esc(m.short) + ' المتوسط</b>' +
+          '<span class="gc-meta">' + arDigit(units.length) + ' وحدات · ' +
+            arDigit(topics) + ' موضوعًا · ' + arDigit(questions) + ' سؤالًا</span>' +
+        '</span>' +
+        '<span class="gc-go">‹</span></button>';
+    });
+
+    html += '</div>' +
+      '<p class="gate-foot">يمكنك تغيير الصف في أي وقت من زر الإعدادات في الأعلى.</p>' +
+      '</div></div>';
+    return html;
+  }
+
+  /* ---------------- settings ---------------- */
+  function viewSettings() {
+    var grade = activeGrade();
+    var fs = store.get('fs', 'm');
+    var serif = store.get('serif', false);
+    var html = '<span class="eyebrow">الإعدادات</span>' +
+      '<h2 class="page-title">التفضيلات</h2>';
+
+    html += '<div class="section-head"><h2>الصف الدراسي</h2></div>' +
+      '<div class="set-card"><div class="set-row">' +
+      '<div><b>الصف الحالي</b><p>يحدد الوحدات والخطط والأسئلة الظاهرة في التطبيق.</p></div></div>' +
+      '<div class="set-grades">';
+    CHOOSABLE.forEach(function (g) {
+      html += '<button type="button" class="set-grade' + (grade === g ? ' on' : '') +
+        '" data-pick-grade="' + esc(g) + '">' +
+        '<span class="pill ' + gmeta(g).cls + '">' + esc(gmeta(g).short) + '</span>' +
+        (grade === g ? '<span class="tick">✓</span>' : '') + '</button>';
+    });
+    html += '</div></div>';
+
+    html += '<div class="section-head"><h2>حجم الخط</h2></div>' +
+      '<div class="set-card"><div class="set-row">' +
+      '<div><b>حجم نص القراءة</b><p>يُطبَّق على كل صفحات التطبيق ويُحفظ لزيارتك القادمة.</p></div></div>' +
+      '<div class="set-fs">';
+    FS_LEVELS.forEach(function (lvl) {
+      html += '<button type="button" class="set-fs-btn' + (fs === lvl ? ' on' : '') +
+        '" data-fs="' + lvl + '"><span class="sfs-a ' + lvl + '">أ</span>' +
+        '<span class="sfs-n">' + FS_LABELS[lvl] + '</span></button>';
+    });
+    html += '</div></div>';
+
+    html += '<div class="section-head"><h2>القراءة</h2></div>' +
+      '<div class="set-card"><div class="set-row">' +
+      '<div><b>خط الأميري</b><p>خط نسخي مريح للقراءة الطويلة بدل الخط الكوفي.</p></div>' +
+      '<button type="button" class="switch' + (serif ? ' on' : '') + '" data-toggle="serif" ' +
+      'role="switch" aria-checked="' + (serif ? 'true' : 'false') + '"><i></i></button>' +
+      '</div></div>';
+
+    html += '<div class="section-head"><h2>العرض</h2></div>' +
+      '<div class="set-card"><div class="set-row">' +
+      '<div><b>ملء الشاشة</b><p>إخفاء أشرطة النظام للقراءة دون تشتيت.</p></div>' +
+      '<button type="button" class="switch" data-fullscreen="1" aria-label="ملء الشاشة"><i></i></button>' +
+      '</div></div>';
+
+    html += '<div class="section-head"><h2>حول التطبيق</h2></div>' +
+      '<div class="set-card"><div class="set-about">' +
+      '<b>ريبو · التربية الفنية</b>' +
+      '<p>دليل معلم التربية الفنية للمرحلة المتوسطة، بوصفه تطبيقًا تفاعليًا يعمل دون إنترنت.</p>' +
+      '<dl class="set-kv"><dt>الإصدار</dt><dd>' + esc((window.REBO_VERSION || {}).version || '—') + '</dd>' +
+      '<dt>المحتوى</dt><dd>' + arDigit(C.units.length) + ' وحدة · ' +
+        arDigit(scopedUnits().length) + ' وحدة · ' + arDigit(scopePlans().length) +
+        ' خطة · ' + arDigit(scopedQuestions()) + ' سؤالًا</dd>' +
+      '</dl></div></div>';
+
+    if (grade) {
+      html += '<div class="reader-nav" style="margin-top:1.2rem">' +
+        '<button class="btn ghost" data-reset-grade="1">تغيير الصف من البداية</button></div>';
+    }
+    return html;
+  }
+
   function viewHome() {
+    var grade = activeGrade();
+    var gm = gmeta(grade);
+    var units = scopedUnits();
+    var topics = units.reduce(function (a, u) { return a + u.sections.length; }, 0);
+    var questions = units.reduce(function (a, u) { return a + u.mcq.length + u.truefalse.length; }, 0);
+    var plates = units.reduce(function (a, u) { return a + (u.plates || []).length; }, 0);
     var last = store.get('last', null);
-    var lastUnit = last ? C.units.filter(function (u) { return u.id === last.id; })[0] : null;
-    var grades = ['الصف الأول المتوسط', 'الصف الثاني المتوسط', 'الصف الثالث المتوسط'];
-    var html = '';
-    html += '<section class="hero">' + heroArt() + '<div class="hero-in">' +
-      '<span class="eyebrow">دليل المعلم · المرحلة المتوسطة</span>' +
-      '<h1>التربية الفنية،<br>بروحٍ جديدة.</h1>' +
-      '<p>كل وحدات دليل التربية الفنية للمرحلة المتوسطة، بخطةٍ واحدة واضحة: مواضيع، أهداف، أدوات، أسئلة تقويم، ومختبر تفاعلي للألوان والمنظور.</p>' +
+    var lastUnit = last ? unitById(last.id) : null;
+    if (lastUnit && !unitAllowed(lastUnit)) lastUnit = null;
+
+    var html = '<section class="hero">' + heroArt() + '<div class="hero-in">' +
+      '<span class="eyebrow">دليل المعلم · الصف ' + esc(gm.short) + ' المتوسط</span>' +
+      '<h1>التربية الفنية</h1>' +
+      '<p class="hero-lead">وحدات صفّك كاملة: مواضيع، أهداف، أدوات، أسئلة تقويم، ومختبر تفاعلي.</p>' +
       '<div class="hero-actions">' +
         '<button class="btn" data-go="index"><svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>ابدأ الفهرس</button>' +
         '<button class="btn ghost" data-go="quiz"><svg viewBox="0 0 24 24"><path d="M12 3.5 14.6 9l6 .8-4.4 4.2 1.1 6-5.3-3-5.3 3 1.1-6L3.4 9.8 9.4 9z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/></svg>اختبر نفسك</button>' +
       '</div>' +
       '<div class="hero-stats">' +
-        '<div><b>' + arDigit(C.units.length) + '</b>وحدة دراسية</div>' +
-        '<div><b>' + arDigit(C.plans.length) + '</b>خطة أسبوعية</div>' +
-        '<div><b>' + arDigit(totalQuestions()) + '</b>سؤال تقويم</div>' +
-        '<div><b>' + arDigit(C.units.reduce(function (a, u) { return a + u.sections.length; }, 0)) + '</b>موضوعًا</div>' +
+        '<div><b>' + arDigit(units.length) + '</b><span>وحدة</span></div>' +
+        '<div><b>' + arDigit(topics) + '</b><span>موضوعًا</span></div>' +
+        '<div><b>' + arDigit(questions) + '</b><span>سؤالًا</span></div>' +
+        '<div><b>' + arDigit(plates) + '</b><span>لوحة</span></div>' +
       '</div>' +
       '</div></section>';
 
     if (lastUnit) {
-      html += '<div class="section-head"><h2>أكمل من حيث توقفت</h2></div>' +
-        '<button class="continue-card" data-unit="' + lastUnit.id + '">' +
+      html += '<button class="continue-card" data-unit="' + lastUnit.id + '">' +
         '<svg class="ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="3"/>' +
         '<circle cx="20" cy="20" r="16" fill="none" stroke="var(--m-teal)" stroke-width="3" stroke-linecap="round" stroke-dasharray="' + (100 * (last.pct || 5) / 100).toFixed(1) + ' 100" pathLength="100" transform="rotate(-90 20 20)"/></svg>' +
-        '<div style="flex:1"><h3>' + esc(lastUnit.title.replace(/^الصف \S+ المتوسط - /, '')) + '</h3>' +
-        '<p>' + esc(gmeta(lastUnit.grade).short) + ' المتوسط · ' + arDigit(lastUnit.sections.length) + ' مواضيع · تقدمك ' + arDigit(Math.round(last.pct || 0)) + '٪</p></div>' +
+        '<span class="cc-body"><h3>' + esc(lastUnit.title.replace(/^الصف \S+ المتوسط - /, '')) + '</h3>' +
+        '<p>تقدمك ' + arDigit(Math.round(last.pct || 0)) + '٪ · ' + arDigit(lastUnit.sections.length) + ' مواضيع</p></span>' +
         '<span class="pill chip-teal">متابعة</span></button>';
     }
 
-    html += '<div class="section-head"><h2>الصفوف</h2><span class="link" data-go="index">كل الوحدات ←</span></div><div class="grade-row">';
-    grades.forEach(function (g, i) {
-      var units = C.units.filter(function (u) { return u.grade === g; });
-      var m = gmeta(g);
-      html += '<button class="grade-card" data-grade="' + esc(g) + '">' +
-        '<span class="g-num">' + arDigit(i + 1) + '</span>' +
-        '<span class="pill ' + m.cls + '">الصف ' + m.short + '</span>' +
-        '<h3 style="margin-top:10px">' + esc(g.replace('الصف ', '')) + '</h3>' +
-        '<p>' + arDigit(units.length) + ' وحدات · ' + arDigit(units.reduce(function (a, u) { return a + u.sections.length; }, 0)) + ' موضوعًا</p>' +
-        '<div class="g-line">' + units.map(function (u) {
-          return '<i style="background:' + (u.grade === 'الصف الأول المتوسط' ? 'rgba(87,195,167,.55)' : u.grade === 'الصف الثاني المتوسط' ? 'rgba(111,140,255,.55)' : 'rgba(169,124,240,.55)') + '"></i>';
-        }).join('') + '</div></button>';
-    });
-    html += '</div>';
+    html += '<div class="section-head"><h2>وحدات صفّك</h2><span class="link" data-go="index">الفهرس ←</span></div>';
+    html += '<div class="unit-list">' + units.map(unitCard).join('') + '</div>';
 
-    html += '<div class="section-head"><h2>اكتشف بالممارسة</h2></div><div class="grade-row">' +
-      '<button class="grade-card" data-go="studio">' +
-        '<span class="pill chip-amber">تفاعلي</span><h3 style="margin-top:10px">مختبر الألوان</h3>' +
-        '<p>امزج الألوان الأساسية وشاهد الألوان الثانوية والثلاثية فورًا.</p></button>' +
-      '<button class="grade-card" data-go="studio">' +
-        '<span class="pill chip-blue">تفاعلي</span><h3 style="margin-top:10px">مخبر المنظور</h3>' +
-        '<p>حرّك خط الأفق ونقطة التلاشي لتفهم العمق على سطح مسطّح.</p></button>' +
-      '<button class="grade-card" data-go="quiz">' +
-        '<span class="pill chip-teal">تقويم</span><h3 style="margin-top:10px">بنك الأسئلة</h3>' +
-        '<p>' + arDigit(totalQuestions()) + ' سؤالًا من أسئلة تقويم الوحدات، بتصحيح فوري.</p></button>' +
+    html += '<div class="section-head"><h2>اكتشف بالممارسة</h2></div><div class="tile-row">' +
+      '<button class="grade-card" data-go="studio"><span class="pill chip-amber">تفاعلي</span>' +
+        '<h3>مختبر الألوان</h3><p>امزج الألوان الأساسية وشاهد الثانوية فورًا.</p></button>' +
+      '<button class="grade-card" data-go="studio"><span class="pill chip-blue">تفاعلي</span>' +
+        '<h3>مخبر المنظور</h3><p>حرّك خط الأفق ونقطة التلاشي لتفهم العمق.</p></button>' +
+      '<button class="grade-card" data-go="quiz"><span class="pill chip-teal">تقويم</span>' +
+        '<h3>بنك الأسئلة</h3><p>' + arDigit(questions) + ' سؤالًا بتصحيح فوري.</p></button>' +
       '</div>';
 
-    html += '<div class="section-head"><h2>من الدليل</h2><span class="link" data-go="intro">المقدمة ←</span></div>' +
-      '<div class="obj-grid">' +
-      C.plans.slice(0, 2).map(function (p) {
-        return '<button class="continue-card" data-plan="' + esc(p.name) + '">' +
-          '<span class="pill chip-amber">خطة أسبوعية</span>' +
-          '<div style="flex:1"><h3>' + esc(p.title) + '</h3><p>' + esc(p.grade) + ' · ' + esc(p.kind || '') + '</p></div>' +
+    html += '<div class="section-head"><h2>خطط الدروس</h2><span class="link" data-go="plans">الكل ←</span></div>' +
+      '<div class="unit-list">' + scopePlans().slice(0, 3).map(function (p) {
+        return '<button class="toc-row" data-plan="' + esc(p.name) + '">' +
+          '<span class="n">◇</span>' +
+          '<span class="tr-body"><span class="t">' + esc(p.title) + '</span>' +
+          '<span class="m">' + esc(p.kind || 'خطة') + ' · ' + arDigit((p.specific || []).length) + ' هدفًا</span></span>' +
           '<span class="u-go">‹</span></button>';
       }).join('') + '</div>';
 
-    html += '<div class="section-head"><h2>وحدات سريعة الوصول</h2></div>';
-    html += C.units.slice(0, 4).map(unitCard).join('');
+    html += '<div class="section-head"><h2>من الدليل</h2><span class="link" data-go="intro">المقدمة ←</span></div>' +
+      '<div class="unit-list"><button class="toc-row" data-go="intro"><span class="n">※</span>' +
+      '<span class="tr-body"><span class="t">المقدمة، طرائق التدريس، وأهداف التربية الفنية</span>' +
+      '<span class="m">من دليل المعلم — صفحات 3–13</span></span><span class="u-go">‹</span></button></div>';
     return html;
   }
 
   function unitCard(u) {
     var m = gmeta(u.grade);
     return '<button class="unit-card" data-unit="' + u.id + '" style="margin-bottom:8px">' +
-      '<span class="u-idx" style="color:' + m.color + '">' + arDigit(u.id) + '</span>' +
-      '<span><h3>' + esc(u.title.replace(/^الصف \S+ المتوسط - /, '')) + '</h3>' +
-      '<p>' + esc(u.grade) + ' · ' + arDigit(u.sections.length) + ' مواضيع · ' + arDigit(u.mcq.length + u.truefalse.length) + ' سؤالًا</p></span>' +
+      '<span class="u-idx" style="color:' + m.color + '">' + arDigit(String(+u.id)) + '</span>' +
+      '<span class="u-body"><h3>' + esc(u.title.replace(/^الصف \S+ المتوسط - /, '')) + '</h3>' +
+      '<p>ص ' + arDigit(u.pages || '—') + ' · ' + arDigit(u.sections.length) + ' مواضيع · ' +
+      arDigit(u.mcq.length + u.truefalse.length) + ' سؤالًا</p></span>' +
       '<span class="u-go">‹</span></button>';
   }
 
   function viewIndex() {
-    var grades = ['الكل', 'الصف الأول المتوسط', 'الصف الثاني المتوسط', 'الصف الثالث المتوسط', 'المرحلة المتوسطة'];
-    var active = store.get('indexFilter', 'الكل');
-    var html = '<span class="eyebrow">فهرس المحتوى</span><h2 style="font-size:22px;margin:8px 0 4px">كل ما في الدليل، مرتّبًا.</h2>' +
-      '<p style="font-size:13px;color:var(--text-mute);margin-bottom:16px">' + arDigit(C.units.length) + ' وحدة و' + arDigit(C.plans.length) + ' خطة درس، مقسّمة حسب الصف والوحدة.</p>';
-    html += '<div class="filter-bar">' + grades.map(function (g) {
-      return '<button class="fbtn' + (g === active ? ' active' : '') + '" data-filter="' + esc(g) + '">' + esc(g === 'الكل' ? 'كل الصفوف' : g.replace('الصف ', '').replace(' المتوسط', ' متوسط')) + '</button>';
-    }).join('') + '</div>';
+    var grade = activeGrade();
+    var units = scopedUnits();
+    var html = '<span class="eyebrow">فهرس المحتوى</span>' +
+      '<h2 style="font-size:1.375rem;margin:.5rem 0 .25rem">' +
+      (grade ? 'كل ما في ' + esc(gmeta(grade).short) + ' المتوسط' : 'كل ما في الدليل') + '</h2>' +
+      '<p style="font-size:.8125rem;color:var(--text-mute);margin-bottom:1rem">' +
+      arDigit(units.length) + ' وحدات و' + arDigit(scopePlans().length) +
+      ' خطة درس، مرتّبة حسب الوحدة.</p>';
     html += '<div class="toc-list">';
-    C.units.forEach(function (u) {
-      if (active !== 'الكل' && u.grade !== active) return;
-      var m = gmeta(u.grade);
+    units.forEach(function (u) {
       html += '<button class="toc-row" data-unit="' + u.id + '">' +
-        '<span class="n">' + arDigit(u.id) + '</span>' +
-        '<span><span class="t">' + esc(u.title.replace(/^الصف \S+ المتوسط - /, '')) + '</span><br>' +
-        '<span class="m">' + esc(u.grade) + ' · ' + esc(unitShort(u)) + ' · ' + arDigit(u.sections.length) + ' مواضيع</span></span>' +
-        '<span class="pill ' + m.cls + '">ص ' + arDigit(u.pages || '') + '</span></button>';
+        '<span class="n">' + arDigit(String(+u.id)) + '</span>' +
+        '<span class="tr-body"><span class="t">' + esc(u.title.replace(/^الصف \S+ المتوسط - /, '')) + '</span>' +
+        '<span class="m">' + arDigit(u.sections.length) + ' مواضيع · ' +
+        arDigit(u.mcq.length + u.truefalse.length) + ' سؤالًا · ص ' + arDigit(u.pages || '—') + '</span></span></button>';
     });
     html += '</div>';
     html += '<div class="section-head"><h2>خطط الدروس الأسبوعية</h2></div><div class="toc-list">';
-    C.plans.forEach(function (p) {
+    scopePlans().forEach(function (p) {
       html += '<button class="toc-row" data-plan="' + esc(p.name) + '"><span class="n">◇</span>' +
-        '<span><span class="t">' + esc(p.title) + '</span><br><span class="m">' + esc(p.grade) + ' · ' + esc(p.kind || 'خطة') + '</span></span>' +
+        '<span class="tr-body"><span class="t">' + esc(p.title) + '</span>' +
+        '<span class="m">' + esc(p.kind || 'خطة') + ' · ' + arDigit((p.specific || []).length) + ' هدفًا</span></span>' +
         '<span class="pill chip-amber">خطة</span></button>';
     });
     html += '</div>';
@@ -258,18 +479,14 @@
   }
 
   function viewGrade(params) {
-    var g = params.grade || 'الصف الأول المتوسط';
-    var units = C.units.filter(function (u) { return u.grade === g; });
+    /* a grade route can only ever show the grade that was chosen */
+    var g = activeGrade() || params.grade;
+    var units = scopedUnits();
     var m = gmeta(g);
     var html = '<span class="pill ' + m.cls + '">' + esc(g) + '</span>' +
-      '<h2 style="font-size:22px;margin:12px 0 4px">وحدات الصف ' + esc(m.short) + '</h2>' +
-      '<p style="font-size:13px;color:var(--text-mute);margin-bottom:18px">اختر وحدة للبدء بالقراءة.</p>';
-    html += units.map(function (u) {
-      return '<button class="unit-card" data-unit="' + u.id + '" style="margin-bottom:9px">' +
-        '<span class="u-idx">' + arDigit(u.id) + '</span><span><h3>' + esc(u.title.replace(/^الصف \S+ المتوسط - /, '')) + '</h3>' +
-        '<p>' + arDigit(u.sections.length) + ' مواضيع · صفحات الدليل ' + arDigit(u.pages || '—') + '</p></span>' +
-        '<span class="u-go">‹</span></button>';
-    }).join('');
+      '<h2 class="page-title">وحدات الصف ' + esc(m.short) + '</h2>' +
+      '<p style="font-size:.8125rem;color:var(--text-mute);margin-bottom:1.1rem">اختر وحدة للبدء بالقراءة.</p>';
+    html += '<div class="unit-list">' + units.map(unitCard).join('') + '</div>';
     return html;
   }
 
@@ -284,17 +501,17 @@
     var html = '<div class="unit-hero uh-plain" data-tint="' + (u.grade || '') + '">' +
       '<div class="uh-grad"></div><div class="uh-body">' +
       '<span class="pill ' + m.cls + '">' + esc(u.grade) + '</span>' +
-      '<h1 style="margin-top:8px">' + esc(u.title.replace(/^الصف \S+ المتوسط - /, '')) + '</h1>' +
-      '<div class="unit-meta"><span class="pill">صفحات الدليل ' + arDigit(u.pages || '—') + '</span>' +
+      '<h1>' + esc(u.title.replace(/^الصف \S+ المتوسط - /, '')) + '</h1>' +
+      '<div class="unit-meta"><span class="pill">ص ' + arDigit(u.pages || '—') + '</span>' +
       '<span class="pill">' + arDigit(u.sections.length) + ' مواضيع</span>' +
-      '<span class="pill">' + arDigit(u.mcq.length + u.truefalse.length) + ' سؤال تقويم</span></div>' +
+      '<span class="pill">' + arDigit(u.mcq.length + u.truefalse.length) + ' سؤال</span></div>' +
       '</div></div>';
 
     html += '<div class="reader-tools">' +
       '<button class="tool-btn' + (bold ? ' active' : '') + '" data-toggle="serif">خط الأميري</button>' +
-      '<button class="tool-btn' + (large ? ' active' : '') + '" data-toggle="large">تكبير الخط</button>' +
       '<span class="spacer"></span>' +
-      '<button class="tool-btn" data-toc="1">فهرس الوحدة</button></div>';
+      '<button class="tool-btn" data-toc="1">فهرس الوحدة</button>' +
+      '<button class="tool-btn" data-settings="1">الإعدادات</button></div>';
 
     html += '<div class="obj-grid">' +
       (u.objectives ? '<div class="obj-card"><h4>الأهداف العامة</h4><p>' + esc(u.objectives) + '</p></div>' : '') +
@@ -326,7 +543,8 @@
       html += '<div class="section-head"><h2>مواضيع الوحدة</h2><span class="link" data-toc="1">انتقال سريع</span></div>' +
         '<div class="toc-list">' + u.sections.map(function (s, i) {
           return '<button class="toc-row" data-sec="sec-' + i + '"><span class="n">' + arDigit(i + 1) + '</span>' +
-            '<span class="t">' + esc(shorten(s.title, 78)) + '</span><span class="m">' + arDigit((s.paras || []).length) + ' فقرة</span></button>';
+            '<span class="tr-body"><span class="t">' + esc(shorten(s.title, 78)) + '</span>' +
+            '<span class="m">' + arDigit((s.paras || []).length) + ' فقرة</span></span></button>';
         }).join('') + '</div>';
     }
 
@@ -348,8 +566,9 @@
         '<div style="margin-top:10px"><button class="btn" data-quiz="' + u.id + '">ابدأ التقويم</button></div>';
     }
 
-    var idx = C.units.indexOf(u);
-    var prev = C.units[idx - 1], next = C.units[idx + 1];
+    var peers = scopedUnits();
+    var idx = peers.indexOf(u);
+    var prev = idx > 0 ? peers[idx - 1] : null, next = idx < peers.length - 1 ? peers[idx + 1] : null;
     html += '<div class="reader-nav">' +
       (prev ? '<button class="btn ghost" data-unit="' + prev.id + '">→ ' + esc(shorten(prev.title.replace(/^الصف \S+ المتوسط - /, ''), 34)) + '</button>' : '') +
       (next ? '<button class="btn" data-unit="' + next.id + '">' + esc(shorten(next.title.replace(/^الصف \S+ المتوسط - /, ''), 34)) + ' ←</button>' : '') +
@@ -379,17 +598,18 @@
 
   function viewPlans() {
     var html = '<span class="eyebrow">الخطة الأسبوعية</span>' +
-      '<h2 style="font-size:22px;margin:8px 0 4px">خطط دروس جاهزة للتنفيذ</h2>' +
-      '<p style="font-size:13px;color:var(--text-mute);margin-bottom:18px">لكل خطة: الموضوع، الأهداف العامة والخاصة، الوسائل، المقدمة، والعرض.</p>';
-    html += '<div class="plan-grid">' + C.plans.map(function (p) {
+      '<h2 class="page-title">خطط دروس جاهزة للتنفيذ</h2>' +
+      '<p style="font-size:.8125rem;line-height:1.8;color:var(--text-mute);margin-bottom:1.1rem">' +
+      'خطط ' + esc(gmeta(activeGrade()).short) + ' المتوسط: الموضوع، الأهداف العامة والخاصة، الوسائل، المقدمة، والعرض.</p>';
+    html += '<div class="plan-grid">' + scopePlans().map(function (p) {
       return '<button class="plan-card" data-plan="' + esc(p.name) + '">' +
         '<span class="pill ' + (p.kind === 'عملي' ? 'chip-blue' : p.kind === 'تهيئة' ? 'chip-amber' : 'chip-teal') + '">' + esc(p.kind || 'خطة') + '</span>' +
-        '<h3>' + esc(p.title) + '</h3><p>' + esc(p.grade) + ' · ' + arDigit((p.specific || []).length) + ' هدفًا خاصًا</p></button>';
+        '<h3>' + esc(p.title) + '</h3><p>' + arDigit((p.specific || []).length) + ' هدفًا خاصًا</p></button>';
     }).join('') + '</div>';
 
     html += '<div class="section-head"><h2>المقدمة وأهداف المادة</h2><span class="link" data-go="intro">قراءة كاملة ←</span></div>' +
       '<div class="toc-list"><button class="toc-row" data-go="intro"><span class="n">※</span>' +
-      '<span><span class="t">المقدمة، طرائق التدريس، وأهداف التربية الفنية</span><br>' +
+      '<span class="tr-body"><span class="t">المقدمة، طرائق التدريس، وأهداف التربية الفنية</span>' +
       '<span class="m">من دليل المعلم — صفحات 3–13</span></span><span class="pill chip-amber">دليل</span></button></div>';
     return html;
   }
@@ -446,7 +666,7 @@
 
   function viewIntro() {
     var I = C.intro || { sections: [] };
-    var html = '<span class="eyebrow">من دليل المعلم</span><h2 style="font-size:22px;margin:8px 0 16px">المقدمة وطرائق التدريس</h2>';
+    var html = '<span class="eyebrow">من دليل المعلم</span><h2 style="font-size:1.375rem;margin:8px 0 16px">المقدمة وطرائق التدريس</h2>';
     (I.sections || []).forEach(function (s, i) {
       html += '<article class="sec"><div class="sec-head"><span class="sec-num">' + arDigit(i + 1) + '</span><h3>' + esc(s.title) + '</h3></div>' +
         (s.paras || []).map(function (p) { return '<p>' + esc(p).replace(/\n/g, '<br>') + '</p>'; }).join('') + '</article>';
@@ -467,7 +687,7 @@
   /* ---------------- quiz ---------------- */
   function buildQuizPool(unitId) {
     var pool = [];
-    C.units.forEach(function (u) {
+    scopedUnits().forEach(function (u) {
       if (unitId && u.id !== unitId) return;
       u.mcq.forEach(function (q) {
         if (!q.options || q.options.length < 2) return;
@@ -509,9 +729,9 @@
     var s = quizState;
     var q = s.pool[s.i];
     var html = '<span class="eyebrow">بنك الأسئلة</span>' +
-      '<h2 style="font-size:22px;margin:8px 0 4px">' + (s.unitId ? 'تقويم الوحدة' : 'اختبر نفسك') + '</h2>' +
-      '<p style="font-size:13px;color:var(--text-mute);margin-bottom:16px">' +
-      (s.unitId ? esc(q.unit.title.replace(/^الصف \S+ المتوسط - /, '')) : 'أسئلة مختارة من كل وحدات المرحلة المتوسطة') +
+      '<h2 class="page-title">' + (s.unitId ? 'تقويم الوحدة' : 'اختبر نفسك') + '</h2>' +
+      '<p style="font-size:.8125rem;line-height:1.8;color:var(--text-mute);margin-bottom:1rem">' +
+      (s.unitId ? esc(q.unit.title.replace(/^الصف \S+ المتوسط - /, '')) : 'أسئلة مختارة من وحدات صفّك') +
       ' · ' + arDigit(s.i + 1) + ' من ' + arDigit(s.pool.length) + '</p>';
 
     html += '<div class="score-pill" style="margin-bottom:14px">' +
@@ -554,7 +774,7 @@
     var msg = pct >= 80 ? 'ممتاز! فهمك للوحدة راسخ.' : pct >= 50 ? 'جيد، ويمكنك التحسّن بمراجعة المواضيع.' : 'راجع الوحدة ثم أعد الاختبار.';
     var html = '<div class="hero" style="text-align:center"><div class="hero-in">' +
       '<span class="eyebrow">نتيجة التقويم</span>' +
-      '<h1 style="font-size:52px;margin:12px 0 2px">' + arDigit(s.score) + '<span style="font-size:22px;opacity:.6">/' + arDigit(s.pool.length) + '</span></h1>' +
+      '<h1 style="font-size:3.25rem;margin:12px 0 2px">' + arDigit(s.score) + '<span style="font-size:1.375rem;opacity:.6">/' + arDigit(s.pool.length) + '</span></h1>' +
       '<p style="margin:0 auto">' + esc(msg) + '</p>' +
       '<div class="hero-actions" style="justify-content:center">' +
       '<button class="btn" data-retry="1">إعادة الاختبار</button>' +
@@ -566,7 +786,7 @@
       html += '<div class="q-card"><div class="q-top"><span class="pill ' + (ok ? 'chip-teal' : 'chip-red') + '">' +
         (ok ? 'صحيحة' : 'خاطئة') + '</span><span class="pill">' + arDigit(i + 1) + '</span></div>' +
         '<div class="q-text" style="margin-bottom:8px">' + esc(q.q) + '</div>' +
-        '<p style="font-size:12.5px;color:var(--text-dim)">الإجابة الصحيحة: <b>' + esc(q.options[q.answer]) + '</b></p></div>';
+        '<p style="font-size:0.78125rem;color:var(--text-dim)">الإجابة الصحيحة: <b>' + esc(q.options[q.answer]) + '</b></p></div>';
     });
     html += '</div>';
     return html;
@@ -591,13 +811,13 @@
 
   function viewStudio() {
     var html = '<span class="eyebrow">المختبر الفني</span>' +
-      '<h2 style="font-size:22px;margin:8px 0 4px">جرّب، امزج، ولاحظ.</h2>' +
-      '<p style="font-size:13px;color:var(--text-mute);margin-bottom:16px">مختبران تفاعليان يشرحان فكرتين أساسيتين في الدليل: مزج الألوان، والمنظور.</p>';
+      '<h2 style="font-size:1.375rem;margin:8px 0 4px">جرّب، امزج، ولاحظ.</h2>' +
+      '<p style="font-size:0.8125rem;color:var(--text-mute);margin-bottom:16px">مختبران تفاعليان يشرحان فكرتين أساسيتين في الدليل: مزج الألوان، والمنظور.</p>';
 
     html += '<div class="lab">' +
       '<div class="card"><div style="padding:18px">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
-        '<h3 style="font-size:16px">مختبر الألوان</h3><span class="pill chip-amber">مزج صباغي</span></div>' +
+        '<h3 style="font-size:1rem">مختبر الألوان</h3><span class="pill chip-amber">مزج صباغي</span></div>' +
         '<div class="mix-pickers">' +
           '<div><span class="eyebrow">اللون الأول</span><div class="swatches" id="swA"></div></div>' +
           '<div><span class="eyebrow">اللون الثاني</span><div class="swatches" id="swB"></div></div>' +
@@ -610,7 +830,7 @@
       '</div></div>' +
       '<div class="card"><div style="padding:18px">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">' +
-        '<h3 style="font-size:16px">مخبر المنظور</h3><span class="pill chip-blue">عمق على سطح</span></div>' +
+        '<h3 style="font-size:1rem">مخبر المنظور</h3><span class="pill chip-blue">عمق على سطح</span></div>' +
         '<div class="persp" id="persp">' +
           '<div class="horizon" id="horizon"></div><div class="vp" id="vp"></div>' +
           '<svg id="perspSvg" viewBox="0 0 400 230" preserveAspectRatio="none"></svg>' +
@@ -619,7 +839,7 @@
         '</div>' +
         '<div class="persp-slider"><span>خط الأفق</span><input type="range" min="25" max="80" value="55" id="hzRange"></div>' +
         '<div class="persp-slider"><span>نقطة التلاشي</span><input type="range" min="10" max="90" value="50" id="vpRange"></div>' +
-        '<p style="font-size:12px;color:var(--text-mute);margin-top:10px;line-height:1.9">كل الخطوط المستقيمة (الطريق، أعمدة الكهرباء، حدود البناية) تتقارب نحو نقطة التلاشي الواقعة على خط الأفق — وهذا أساس إظهار البعد الثالث في اللوحة.</p>' +
+        '<p style="font-size:0.75rem;color:var(--text-mute);margin-top:10px;line-height:1.9">كل الخطوط المستقيمة (الطريق، أعمدة الكهرباء، حدود البناية) تتقارب نحو نقطة التلاشي الواقعة على خط الأفق — وهذا أساس إظهار البعد الثالث في اللوحة.</p>' +
       '</div></div>' +
       '</div>';
 
@@ -833,7 +1053,7 @@
   /* ---------------- search ---------------- */
   function buildSearchDocs() {
     var docs = [];
-    C.units.forEach(function (u) {
+    scopedUnits().forEach(function (u) {
       docs.push({ kind: 'وحدة', label: u.title, text: u.objectives || '', nav: { unit: u.id } });
       (u.sections || []).forEach(function (s, i) {
         docs.push({ kind: 'موضوع', label: s.title, text: (s.paras || []).join(' '), nav: { unit: u.id, sec: 'sec-' + i } });
@@ -902,8 +1122,8 @@
   function errorView(err) {
     return '<div class="empty" style="text-align:center;padding:40px 20px">' +
       '<div class="eyebrow">حدث خطأ غير متوقع</div>' +
-      '<h2 style="font-size:19px;margin:10px 0 6px">تعذّر عرض هذه الصفحة</h2>' +
-      '<p style="font-size:13px;color:var(--text-mute);margin-bottom:18px">' +
+      '<h2 style="font-size:1.1875rem;margin:10px 0 6px">تعذّر عرض هذه الصفحة</h2>' +
+      '<p style="font-size:0.8125rem;color:var(--text-mute);margin-bottom:18px">' +
       'جرّب العودة إلى الصفحة الرئيسية أو الفهرس.</p>' +
       '<div class="hero-actions" style="justify-content:center">' +
       '<button class="btn" data-go="home">الصفحة الرئيسية</button>' +
@@ -915,6 +1135,27 @@
     current = { name: name, params: params };
     var view = $('#view');
     var html = '';
+
+    /* First-run gate: until a grade is chosen the app shows the chooser and
+       nothing else — no unit, plan or quiz is reachable by URL. */
+    if (!activeGrade() && name !== 'gradeGate' && name !== 'settings') {
+      if (location.hash !== '#choose') history.replaceState({}, '', '#choose');
+      name = 'gradeGate';
+      params = {};
+      current = { name: 'gradeGate', params: {} };
+    }
+    if (name === 'unit' && !unitAllowed(unitById(params.id))) {
+      html = '<div class="empty" style="text-align:center;padding:2.5rem 1.25rem">' +
+        '<span class="eyebrow">خارج نطاق صفّك</span>' +
+        '<h2 style="font-size:1.1875rem;margin:.6rem 0 .4rem">هذه الوحدة لصفٍّ آخر</h2>' +
+        '<p style="font-size:.8125rem;color:var(--text-mute);margin-bottom:1.1rem">' +
+        'اخترت الصف ' + esc(gmeta(activeGrade()).short) + ' المتوسط، فالوحدات المعروضة من صفّك فقط.</p>' +
+        '<button class="btn" data-go="settings">تغيير الصف</button></div>';
+      view.innerHTML = fontBar() + html;
+      syncFontBars();
+      return;
+    }
+
     try {
     switch (name) {
       case 'home': html = viewHome(); break;
@@ -927,13 +1168,18 @@
       case 'studio': html = viewStudio(); break;
       case 'quiz': html = viewQuiz(params); break;
       case 'result': html = viewResult(); break;
+      case 'settings': html = viewSettings(); break;
+      case 'gradeGate': html = viewGradeGate(); break;
       default: html = viewHome();
     }
     } catch (err) {
       if (window.console) console.error('[rebo] view failed:', name, err);
       html = errorView(err);
     }
+    /* The reading-scale control is part of every page, not just the reader. */
+    if (name !== 'gradeGate') html = fontBar() + html;
     view.innerHTML = html;
+    syncFontBars();
     view.scrollTop = 0;
     window.scrollTo(0, 0);
     if (name !== 'unit') { $('#readProgress').style.width = '0'; document.body.classList.remove('serif', 'large'); }
@@ -949,6 +1195,7 @@
     }
     if (name === 'grade') t = params.grade || 'الوحدات';
     setTitle(t);
+    syncGradeChip();
     if (name === 'unit' && params.anchor) {
       setTimeout(function () {
         var el = document.getElementById(params.anchor);
@@ -959,8 +1206,21 @@
 
   /* ---------------- events ---------------- */
   document.addEventListener('click', function (e) {
-    var t = e.target.closest('[data-go],[data-unit],[data-plan],[data-grade],[data-filter],[data-sec],[data-quiz],[data-gallery],[data-ans],[data-next],[data-retry],[data-toggle],[data-toc]');
+    var t = e.target.closest('[data-go],[data-unit],[data-plan],[data-grade],[data-filter],[data-sec],[data-quiz],[data-gallery],[data-ans],[data-next],[data-retry],[data-toggle],[data-toc],[data-fs],[data-fs-step],[data-pick-grade],[data-reset-grade],[data-settings]');
     if (!t) return;
+
+    /* ---- reading scale: the button lives on every page ---- */
+    if (t.dataset.fs) { setFontScale(t.dataset.fs); return; }
+    if (t.dataset.fsStep) {
+      var nf = FS_LEVELS[Math.max(0, Math.min(FS_LEVELS.length - 1,
+        FS_LEVELS.indexOf(store.get('fs', 'm')) + (+t.dataset.fsStep)))];
+      setFontScale(nf);
+      return;
+    }
+    /* ---- grade choice ---- */
+    if (t.dataset.pickGrade) { setGrade(t.dataset.pickGrade); return; }
+    if (t.dataset.resetGrade) { clearGrade(); return; }
+    if (t.dataset.settings) { closeDrawer(); return go('settings', {}); }
 
     if (t.dataset.go) { closeDrawer(); return go(t.dataset.go, {}); }
     if (t.dataset.unit) {
@@ -993,6 +1253,12 @@
       store.set(k, v);
       document.body.classList.toggle(k, v);
       t.classList.toggle('active', v);
+      /* the switch in الإعدادات reflects its state through .on */
+      $$('[data-toggle="' + k + '"]').forEach(function (b) {
+        b.classList.toggle('on', v);
+        b.setAttribute('aria-checked', v ? 'true' : 'false');
+        b.classList.toggle('active', v);
+      });
       return;
     }
     if (t.dataset.toc) {
@@ -1076,13 +1342,15 @@
   });
 
   /* fullscreen */
-  $('#fsBtn').addEventListener('click', function () {
-    var d = document;
-    if (!d.fullscreenElement) {
-      (d.documentElement.requestFullscreen || function () {}).call(d.documentElement);
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      (document.documentElement.requestFullscreen || function () {}).call(document.documentElement);
     } else {
-      (d.exitFullscreen || function () {}).call(d);
+      (document.exitFullscreen || function () {}).call(document);
     }
+  }
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('[data-fullscreen]')) toggleFullscreen();
   });
 
   /* drawer nav */
@@ -1090,11 +1358,12 @@
     var nav = $('#drawerNav');
     nav.innerHTML = [
       ['home', 'الرئيسية'], ['index', 'الفهرس'], ['plans', 'خطط الدروس'],
-      ['studio', 'المختبر الفني'], ['quiz', 'اختبر نفسك'], ['intro', 'المقدمة']
+      ['studio', 'المختبر الفني'], ['quiz', 'اختبر نفسك'], ['intro', 'المقدمة'],
+      ['settings', 'الإعدادات']
     ].map(function (r) {
       return '<button data-go="' + r[0] + '"><span class="dot"></span>' + r[1] + '</button>';
     }).join('') + '<div style="height:10px"></div>' +
-      Object.keys(GRADE_META).map(function (grade) {
+      (activeGrade() ? [activeGrade()] : []).map(function (grade) {
         var units = C.units.filter(function (u) { return u.grade === grade; });
         if (!units.length) return '';
         return '<span class="drawer-sec">' + esc(grade) + '</span>' +
@@ -1108,9 +1377,8 @@
 
   /* ---------------- boot ---------------- */
   function boot() {
-    $('#statUnits').textContent = arDigit(C.units.length);
-    $('#statPlans').textContent = arDigit(C.plans.length);
-    $('#statQ').textContent = arDigit(totalQuestions());
+    applyFontScale();
+    syncShellCounts();
     buildDrawerNav();
     var p = parseHash();
     render(p.name, p.params);
