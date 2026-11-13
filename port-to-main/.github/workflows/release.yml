@@ -1,0 +1,241 @@
+# Release pipeline for مِرسم (the Flutter app on `main`).
+#
+# This workflow is the port of the release job that already exists on the
+# WebView branch (`.github/workflows/apk.yml` there). `main`'s own CI
+# (`.github/workflows/ci.yml`) builds the APK and the Windows package on every
+# push but only uploads them as short-lived artifacts — nothing is ever
+# published as a permanent, downloadable release. This workflow closes that
+# gap: pushing a tag such as `mirsam-v1.0.0` builds both targets and publishes
+# a GitHub Release with the APK, the Windows zip and the checksums.
+#
+# To publish a release:
+#   git tag mirsam-v1.0.0 && git push origin mirsam-v1.0.0
+#
+# Optional release signing (recommended for distribution): add these repository
+# secrets and the APK will be signed with your own key instead of the debug key.
+#   ANDROID_KEYSTORE_BASE64  base64 of your .jks/.keystore
+#   ANDROID_KEY_ALIAS        key alias inside the keystore
+#   ANDROID_KEY_PASSWORD     key password
+#   ANDROID_STORE_PASSWORD   keystore password
+# Without them the build falls back to the debug key, exactly as ci.yml does.
+
+name: Release
+
+on:
+  push:
+    tags: ['mirsam-v*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish a GitHub Release from this run'
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: 3.35.0
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Restore the Flutter SDK
+        id: sdk
+        uses: actions/cache@v4
+        with:
+          path: ~/flutter
+          key: flutter-sdk-linux-${{ env.FLUTTER_VERSION }}
+      - name: Install the official Flutter ${{ env.FLUTTER_VERSION }} SDK
+        if: steps.sdk.outputs.cache-hit != 'true'
+        run: |
+          curl -fL --retry 3 -o /tmp/flutter.tar.xz \
+            "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
+          tar xf /tmp/flutter.tar.xz -C "$HOME"
+      - name: Put Flutter on the PATH
+        run: |
+          echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
+          git config --global --add safe.directory "$HOME/flutter"
+      - name: Resolve the dependencies
+        run: flutter pub get
+      - name: Configure release signing (optional)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/release.jks
+            {
+              echo "storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}"
+              echo "keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}"
+              echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}"
+              echo "storeFile=release.jks"
+            } > android/key.properties
+            echo "::notice::release signing configured from secrets"
+          else
+            echo "::warning::no ANDROID_KEYSTORE_BASE64 secret; the APK will use the debug key"
+          fi
+      - name: Build the release APK
+        run: flutter build apk --release
+      - name: Verify the packaged APK
+        run: |
+          set -euo pipefail
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          ls -l "$APK"
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          BUILD_TOOLS="$(ls -d "$SDK"/build-tools/* | sort -V | tail -1)"
+          "$BUILD_TOOLS/aapt" dump badging "$APK" > /tmp/badging.txt
+          grep -q "package: name='com.techtouchai.mirsam'" /tmp/badging.txt
+          grep -q "sdkVersion:'24'" /tmp/badging.txt
+          grep -q "targetSdkVersion:'36'" /tmp/badging.txt
+          for asset in \
+            assets/content/curriculum.json \
+            assets/content/lessons.json \
+            assets/content/glossary.json \
+            assets/content/plates.json \
+            assets/fonts/Almarai-Regular.ttf \
+            assets/fonts/Amiri-Regular.ttf \
+            assets/illustrations/studio.svg \
+            assets/illustrations/perspective.svg \
+            assets/images/plates/plate-08.jpg \
+            assets/images/plates/plate-19.jpg ; do
+            if ! unzip -l "$APK" | grep -q "flutter_assets/$asset"; then
+              echo "::error::the APK is missing $asset"
+              exit 1
+            fi
+          done
+          echo "::notice::APK verified: package, SDK levels and bundled assets are present"
+      - name: Stage the release files
+        run: |
+          mkdir -p dist
+          VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/mirsam-android-${VERSION}.apk"
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mirsam-android-apk
+          path: dist
+          if-no-files-found: error
+
+  windows:
+    name: Windows EXE
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore the Flutter SDK
+        id: sdk
+        uses: actions/cache@v4
+        with:
+          path: C:\flutter
+          key: flutter-sdk-windows-${{ env.FLUTTER_VERSION }}
+      - name: Install the official Flutter ${{ env.FLUTTER_VERSION }} SDK
+        if: steps.sdk.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          $version = $env:FLUTTER_VERSION
+          $url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_$version-stable.zip"
+          $archive = Join-Path $env:RUNNER_TEMP 'flutter.zip'
+          Invoke-WebRequest -Uri $url -OutFile $archive -UseBasicParsing -MaximumRedirection 5
+          Expand-Archive -Path $archive -DestinationPath 'C:\' -Force
+          if (-not (Test-Path 'C:\flutter\bin\flutter.bat')) { throw 'Flutter SDK layout unexpected' }
+      - name: Put Flutter on the PATH
+        shell: pwsh
+        run: |
+          echo "C:\flutter\bin" >> $env:GITHUB_PATH
+          git config --global --add safe.directory C:/flutter
+      - name: Enable the Windows desktop target
+        shell: pwsh
+        run: |
+          flutter config --enable-windows-desktop
+          flutter --version
+      - name: Resolve the dependencies
+        shell: pwsh
+        run: flutter pub get
+      - name: Precache the Windows engine artifacts
+        shell: pwsh
+        run: flutter precache --windows
+      - name: Build the Windows application
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          flutter build windows --release 2>&1 | Tee-Object -FilePath windows-build.log
+          $status = $LASTEXITCODE
+          python tools/ci_report.py log windows-build.log
+          exit $status
+      - name: Package the complete distribution folder
+        shell: pwsh
+        run: |
+          $out = 'build\windows\x64\runner\Release'
+          if (-not (Test-Path $out)) { throw "Release folder missing: $out" }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $version = (Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)').Matches[0].Groups[1].Value
+          $zip = "dist\mirsam-windows-$version-x64.zip"
+          Compress-Archive -Path "$out\*" -DestinationPath $zip -Force
+          Get-ChildItem dist | Select-Object Name, Length | Format-Table | Out-String | Write-Host
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mirsam-windows-x64
+          path: dist
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: [android, windows]
+    if: startsWith(github.ref, 'refs/tags/mirsam-v') || (github.event_name == 'workflow_dispatch' && inputs.publish)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Resolve the version
+        id: version
+        run: |
+          VERSION="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=mirsam-v${VERSION}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum mirsam-android-*.apk mirsam-windows-*.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Publish the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: مِرسم · التربية الفنية ${{ steps.version.outputs.version }}
+          body: |
+            ## مِرسم — التربية الفنية للمرحلة المتوسطة
+
+            تطبيق تعليمي عربي يعمل دون إنترنت على أندرويد وويندوز.
+
+            | الملف | الوصف |
+            | --- | --- |
+            | `mirsam-android-${{ steps.version.outputs.version }}.apk` | أندرويد (APK) |
+            | `mirsam-windows-${{ steps.version.outputs.version }}-x64.zip` | ويندوز (مجلد التطبيق كاملاً) |
+            | `SHA256SUMS.txt` | بصمات SHA-256 للتحقق |
+
+            > تحقّق من البصمة قبل التثبيت: `sha256sum -c SHA256SUMS.txt`
+          files: |
+            dist/mirsam-android-*.apk
+            dist/mirsam-windows-*.zip
+            dist/SHA256SUMS.txt
+          fail_on_unmatched_files: true
