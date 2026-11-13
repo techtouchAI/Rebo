@@ -148,9 +148,9 @@ void main() {
     final error = tester.takeException();
     final overflows = findFlexOverflows(tester);
     if (error != null || overflows.isNotEmpty) {
-      debugPrint('LAYOUT-DIAG [shell] error=${error ?? 'none'}');
+      reportLayoutDiagnostic('[shell] error=${error ?? 'none'}');
       for (final hit in overflows) {
-        debugPrint('LAYOUT-DIAG [shell] $hit');
+        reportLayoutDiagnostic('[shell] $hit');
       }
     }
     expect(overflows, isEmpty, reason: 'shell overflow');

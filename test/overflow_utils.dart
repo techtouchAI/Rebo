@@ -1,7 +1,18 @@
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+/// Appends a one-line diagnosis to a file the CI step turns into annotations.
+void reportLayoutDiagnostic(String message) {
+  final line = "LAYOUT-DIAG ${message.replaceAll(RegExp(r'\s+'), ' ')}\n";
+  try {
+    File('layout-report.txt').writeAsStringSync(line, mode: FileMode.append, flush: true);
+  } catch (_) {
+    // Reporting must never break a test run.
+  }
+}
 
 /// Finds the flexible rows/columns whose children are laid out past the edge.
 ///

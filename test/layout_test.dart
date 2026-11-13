@@ -24,9 +24,9 @@ Future<void> expectFitsPhone(WidgetTester tester, Widget screen, String name) as
   final error = tester.takeException();
   final overflows = findFlexOverflows(tester);
   if (error != null || overflows.isNotEmpty) {
-    debugPrint('LAYOUT-DIAG [$name] error=${error ?? 'none'}');
+    reportLayoutDiagnostic('[$name] error=${error ?? 'none'}');
     for (final hit in overflows) {
-      debugPrint('LAYOUT-DIAG [$name] $hit');
+      reportLayoutDiagnostic('[$name] $hit');
     }
   }
   expect(overflows, isEmpty, reason: 'layout overflow on $name');

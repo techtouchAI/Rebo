@@ -85,6 +85,9 @@ jobs:
           flutter test --reporter json > "$RUNNER_TEMP/tests.json" 2>&1
           status=$?
           python3 tools/ci_report.py test "$RUNNER_TEMP/tests.json" "$status"
+          if [ -f layout-report.txt ]; then
+            head -c 4000 layout-report.txt | sed 's/^/::error::/'
+          fi
           exit $status
 
   android:
