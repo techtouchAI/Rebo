@@ -265,15 +265,12 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
 
     skipped = set(args.skip)
-    version_sync()
-    for fn, key in ((content_complete, "content"), (assets_present, "assets"),
-                    (javascript_parses, "javascript"), (apk_integrity, "apk"),
-                    (windows_binaries, "windows")):
+    for fn, key in ((version_sync, "version"), (content_complete, "content"),
+                    (assets_present, "assets"), (javascript_parses, "javascript"),
+                    (apk_integrity, "apk"), (windows_binaries, "windows")):
         if key in skipped:
             record(SKIP, fn.__name__.replace("_", " "), "--skip " + key)
             continue
-        if fn.__name__ == "apk_integrity" and "version" in skipped:
-            pass
         fn()
 
     width = max(len(name) for _s, name, _d in results)
