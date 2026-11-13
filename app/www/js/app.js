@@ -601,19 +601,31 @@
   }
 
   function viewPlans() {
+    var plans = scopePlans();
+    var grade = gmeta(activeGrade()).short;
+
+    if (!plans.length) {
+      return '<span class="eyebrow">الخطة الأسبوعية</span>' +
+        '<h2 class="page-title">خطط الدروس</h2>' +
+        '<div class="set-card" style="text-align:center;padding:1.6rem 1.2rem">' +
+        '<p style="font-size:.8125rem;line-height:1.95;color:var(--text-dim)">' +
+        'خطط الدروس التسع في هذا الدليل مكتوبة لـ«الصف الأول المتوسط»، ولذلك لا تظهر ' +
+        'في الصف ' + esc(grade) + ' المتوسط. وحدات صفّك وأسئلتها كاملة في الفهرس.</p>' +
+        '<div style="margin-top:1rem"><button class="btn" data-go="index">فهرس صفّي</button></div>' +
+        '</div>' +
+        '<div class="section-head"><h2>المقدمة وأهداف المادة</h2>' +
+        '<span class="link" data-go="intro">قراءة كاملة ←</span></div>' +
+        '<div class="toc-list"><button class="toc-row" data-go="intro"><span class="n">※</span>' +
+        '<span class="tr-body"><span class="t">المقدمة، طرائق التدريس، وأهداف التربية الفنية</span>' +
+        '<span class="m">من دليل المعلم — صفحات 3–13</span></span>' +
+        '<span class="pill chip-amber">دليل</span></button></div>';
+    }
+
     var html = '<span class="eyebrow">الخطة الأسبوعية</span>' +
       '<h2 class="page-title">خطط دروس جاهزة للتنفيذ</h2>' +
       '<p style="font-size:.8125rem;line-height:1.8;color:var(--text-mute);margin-bottom:1.1rem">' +
-      'خطط ' + esc(gmeta(activeGrade()).short) + ' المتوسط: الموضوع، الأهداف العامة والخاصة، الوسائل، المقدمة، والعرض.</p>';
-    if (!scopePlans().length) {
-      return html + '<div class="set-card" style="text-align:center;padding:1.6rem 1.2rem">' +
-        '<p style="font-size:.8125rem;line-height:1.9;color:var(--text-dim)">' +
-        'خطط الدروس في هذا الدليل مكتوبة لصفوف أخرى، ولذلك لا تظهر هنا احترامًا لاختيارك ' +
-        '«الصف ' + esc(gmeta(activeGrade()).short) + ' المتوسط». ' +
-        'وحدات صفّك وأسئلتها كاملة في الفهرس.</p>' +
-        '<div style="margin-top:1rem"><button class="btn" data-go="index">فهرس صفّي</button></div></div>';
-    }
-    html += '<div class="plan-grid">' + scopePlans().map(function (p) {
+      'خطط ' + esc(grade) + ' المتوسط: الموضوع، الأهداف العامة والخاصة، الوسائل، المقدمة، والعرض.</p>';
+    html += '<div class="plan-grid">' + plans.map(function (p) {
       return '<button class="plan-card" data-plan="' + esc(p.name) + '">' +
         '<span class="pill ' + (p.kind === 'عملي' ? 'chip-blue' : p.kind === 'تهيئة' ? 'chip-amber' : 'chip-teal') + '">' + esc(p.kind || 'خطة') + '</span>' +
         '<h3>' + esc(p.title) + '</h3><p>' + arDigit((p.specific || []).length) + ' هدفًا خاصًا</p></button>';
