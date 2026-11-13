@@ -29,13 +29,10 @@ List<String> findFlexOverflows(WidgetTester tester) {
       child = render.childAfter(child);
     }
     if (extent > limit + 0.5) {
-      final creator = render.debugCreator;
-      final element = creator is DebugCreator ? creator.element : null;
-      final chain = element?.debugGetCreatorChain(6) ?? creator?.toString() ?? 'unknown creator';
       hits.add(
         'overflows ${(extent - limit).toStringAsFixed(1)}px '
         '(${extent.toStringAsFixed(1)} > ${limit.toStringAsFixed(1)}, ${render.direction.name}) '
-        'from $chain',
+        'from ${render.debugCreator ?? "an unknown flex"}',
       );
     }
   }
