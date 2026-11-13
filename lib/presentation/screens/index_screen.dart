@@ -29,7 +29,6 @@ class _IndexScreenState extends State<IndexScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
-    final library = state.library;
     return SafeArea(
       bottom: false,
       child: ListView(
@@ -37,7 +36,7 @@ class _IndexScreenState extends State<IndexScreen> {
         children: <Widget>[
           AppPageHeader(
             title: 'الفهرس',
-            subtitle: 'اثنتا عشرة وحدة دراسية، ودروس تطبيقية، ولوحات مصوّرة',
+            subtitle: 'وحدات ${state.gradeTitle} والدروس التطبيقية واللوحات',
             actions: <Widget>[
               IconButton(
                 tooltip: 'بحث',
