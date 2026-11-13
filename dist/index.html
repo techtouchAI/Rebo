@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ريبو · التربية الفنية — تنزيل الإصدار 1.0.0</title>
+<style>
+  :root{
+    --ink:#0d1016;--ink2:#141922;--line:rgba(255,255,255,.1);--text:#eef1f7;
+    --dim:#a3adbf;--mute:#758195;--teal:#57c3a7;--blue:#6f8cff;--amber:#e8b44a;--violet:#a97cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    min-height:100vh;background:
+      radial-gradient(120% 90% at 100% 0%,rgba(111,140,255,.16),transparent 60%),
+      radial-gradient(100% 80% at 0% 100%,rgba(87,195,167,.14),transparent 60%),
+      var(--ink);
+    color:var(--text);font:400 16px/1.7 "Segoe UI","Noto Naskh Arabic",Tahoma,sans-serif;
+    padding:clamp(20px,5vw,64px) 16px;
+  }
+  .wrap{max-width:860px;margin:0 auto}
+  header{display:flex;align-items:center;gap:16px;margin-bottom:40px}
+  .mark{width:56px;height:56px;border-radius:16px;flex:none;display:grid;place-items:center;
+    background:linear-gradient(155deg,rgba(111,140,255,.28),rgba(87,195,167,.2));
+    border:1px solid rgba(255,255,255,.18)}
+  .mark svg{width:34px;height:34px}
+  .brand b{display:block;font-size:1.25rem;font-weight:800;line-height:1.2}
+  .brand span{font-size:.8125rem;color:var(--mute)}
+  h1{font-size:clamp(1.5rem,4.5vw,2.25rem);line-height:1.35;font-weight:800;margin-bottom:10px}
+  h1 em{font-style:normal;color:var(--teal)}
+  .lead{color:var(--dim);font-size:1rem;max-width:56ch;margin-bottom:32px}
+  .cards{display:grid;gap:14px}
+  .card{display:flex;align-items:center;gap:16px;padding:18px 20px;border-radius:18px;
+    border:1px solid var(--line);background:linear-gradient(160deg,rgba(255,255,255,.055),rgba(255,255,255,.015));
+    text-decoration:none;color:inherit;transition:.18s}
+  .card:hover{border-color:rgba(255,255,255,.26);background:rgba(255,255,255,.075);transform:translateY(-2px)}
+  .card .ico{width:48px;height:48px;border-radius:14px;flex:none;display:grid;place-items:center;
+    background:rgba(255,255,255,.06);border:1px solid var(--line);font-size:1.25rem}
+  .card .body{flex:1;min-width:0}
+  .card .body b{display:block;font-size:1rem;margin-bottom:2px}
+  .card .body span{display:block;font-size:.8125rem;color:var(--mute)}
+  .card .meta{flex:none;text-align:left;font-size:.75rem;color:var(--mute)}
+  .card .meta b{display:block;font-size:.875rem;color:var(--teal);font-weight:700}
+  .tag{display:inline-block;padding:1px 8px;border-radius:999px;font-size:.6875rem;font-weight:700;
+    border:1px solid rgba(87,195,167,.35);color:#8fdfc9;background:rgba(87,195,167,.12);margin-inline-start:8px}
+  .tag.amber{border-color:rgba(232,180,74,.35);color:#f4cf85;background:rgba(232,180,74,.12)}
+  .tag.blue{border-color:rgba(111,140,255,.35);color:#a9b9ff;background:rgba(111,140,255,.12)}
+  h2{font-size:1.0625rem;margin:40px 0 14px;font-weight:700}
+  ol,ul{padding-inline-start:20px;color:var(--dim);font-size:.9375rem;display:grid;gap:8px}
+  code{background:rgba(255,255,255,.07);padding:2px 7px;border-radius:6px;font-size:.8125rem;
+    direction:ltr;display:inline-block;font-family:ui-monospace,Consolas,monospace}
+  .sums{width:100%;border-collapse:collapse;font-size:.75rem;margin-top:10px;direction:ltr;text-align:left}
+  .sums td{padding:9px 10px;border-bottom:1px solid var(--line);
+    font-family:ui-monospace,Consolas,monospace;word-break:break-all;color:var(--dim)}
+  .sums td:last-child{color:var(--text);text-align:right;white-space:nowrap;font-family:inherit}
+  .note{padding:14px 16px;border-radius:14px;border:1px solid rgba(232,180,74,.28);
+    background:rgba(232,180,74,.08);font-size:.875rem;color:#f0dcb0;line-height:1.9}
+  footer{margin-top:48px;padding-top:20px;border-top:1px solid var(--line);
+    font-size:.75rem;color:var(--mute);display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between}
+  a{color:var(--teal)}
+  @media(max-width:520px){
+    .card .meta{display:none}
+    .card{padding:15px 16px;gap:12px}
+    .card .ico{width:42px;height:42px;font-size:1.05rem}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 200 200">
+        <path d="M100 24 L176 100 L100 176 L24 100 Z" fill="none" stroke="#8ab4ff" stroke-width="5" opacity=".5"/>
+        <path d="M38 142 C 70 56, 130 56, 162 142" fill="none" stroke="#57c3a7" stroke-width="12" stroke-linecap="round"/>
+        <circle cx="100" cy="100" r="15" fill="#e8c07d"/>
+      </svg>
+    </div>
+    <div class="brand">
+      <b>ريبو · التربية الفنية</b>
+      <span>دليل معلم المرحلة المتوسطة — يعمل دون إنترنت</span>
+    </div>
+  </header>
+
+  <h1>الإصدار <em>١.٠.٠</em> جاهز للتنزيل</h1>
+  <p class="lead">
+    التطبيق كامل: ١٣ وحدة، ٥٥ موضوعًا، ٧٦ سؤال تقويم، ١٩ لوحة من الدليل، و٩ خطط دروس.
+    اختر نسخة جهازك من الأسفل.
+  </p>
+
+  <div class="cards">
+
+    <a class="card" href="rebo-android-v1.0.0.apk" download>
+      <span class="ico" aria-hidden="true">🤖</span>
+      <span class="body">
+        <b>أندرويد<span class="tag">موصى به</span></b>
+        <span>أندرويد ٧.٠ وأحدث · موقّع v2+v3 ومحاذى</span>
+      </span>
+      <span class="meta"><b>٢.٠</b>MB · APK</span>
+    </a>
+
+    <a class="card" href="Rebo-Setup-1.0.0.exe" download>
+      <span class="ico" aria-hidden="true">🪟</span>
+      <span class="body">
+        <b>ويندوز — مثبّت<span class="tag blue">للمستخدم</span></b>
+        <span>ويندوز ١٠/١١ · تثبيت بلا صلاحيات مدير · اختصار في قائمة ابدأ</span>
+      </span>
+      <span class="meta"><b>٣.٢</b>MB · EXE</span>
+    </a>
+
+    <a class="card" href="Rebo-Windows-1.0.0-portable.zip" download>
+      <span class="ico" aria-hidden="true">📦</span>
+      <span class="body">
+        <b>ويندوز — نسخة محمولة<span class="tag amber">بلا تثبيت</span></b>
+        <span>فُكّ الضغط وشغّل <code>Rebo.exe</code> · يصلح لفلاشة USB</span>
+      </span>
+      <span class="meta"><b>٢.٢</b>MB · ZIP</span>
+    </a>
+
+    <a class="card" href="SHA256SUMS.txt" download>
+      <span class="ico" aria-hidden="true">🔐</span>
+      <span class="body">
+        <b>بصمات التحقق</b>
+        <span>SHA-256 لكل ملف — تحقّق قبل التثبيت</span>
+      </span>
+      <span class="meta">TXT</span>
+    </a>
+
+  </div>
+
+  <h2>التثبيت</h2>
+  <ol>
+    <li><b>أندرويد:</b> افتح ملف APK، وإن ظهرت رسالة «التثبيت من مصدر غير معروف» فاسمح للتطبيق الذي فتحته (المتصفح أو مدير الملفات) بهذا المرة فقط.</li>
+    <li><b>ويندوز:</b> شغّل <code>Rebo-Setup-1.0.0.exe</code> واختر «تثبيت». لا يحتاج صلاحيات مدير، ويُثبَّت في مجلد المستخدم.</li>
+    <li><b>النسخة المحمولة:</b> فُكّ ضغط الملف في أي مجلد أو فلاشة، ثم شغّل <code>Rebo.exe</code>.</li>
+  </ol>
+
+  <div class="note">
+    <b>مكتبة WebView2 على ويندوز:</b> التطبيق يعرض واجهته عبر WebView2، وهي مثبّتة افتراضيًا في ويندوز ١١
+    وأغلب أجهزة ويندوز ١٠. إن ظهرت رسالة نقصها، فالمثبّت يفتح لك صفحة التنزيل الرسمية من Microsoft.
+  </div>
+
+  <h2>التحقق من سلامة الملفات</h2>
+  <p class="lead" style="margin-bottom:8px;font-size:.875rem">
+    بعد التنزيل، شغّل هذا الأمر في مجلد التنزيل وقارن النتيجة:
+    <code>sha256sum -c SHA256SUMS.txt</code>
+  </p>
+  <table class="sums">
+<tr><td>c67929b392e767a7ff9d50e76379e3d9281365bceb85d28c5a9920e96825453e</td><td>rebo-android-v1.0.0.apk</td></tr>
+    <tr><td>0c0a8880e7390e7a2cdc7db8e9ec1b9755bc234b1fa24db21f7f42befb202e79</td><td>Rebo-Setup-1.0.0.exe</td></tr>
+    <tr><td>626f63ce2006eeece46bdcab423e0bca52bbe9e1c5902ff384639d7ac20a8893</td><td>Rebo-Windows-1.0.0-portable.zip</td></tr>
+  </table>
+
+  <footer>
+    <span>© TechTouch AI — المحتوى من دليل المعلم الرسمي.</span>
+    <span>البناء ١.٠.٠ · قابل لإعادة الإنتاج · يعمل دون إنترنت</span>
+  </footer>
+
+</div>
+</body>
+</html>
