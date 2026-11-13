@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520">
+  <rect x="60" y="40" width="680" height="440" rx="10" fill="none" stroke="#D9A34A" stroke-width="6"/>
+  <rect x="76" y="56" width="648" height="408" rx="4" fill="none" stroke="#1E5F74" stroke-width="2"/>
+  <g fill="none" stroke="#1E5F74" stroke-width="4" opacity="0.9">
+    <circle cx="240" cy="180" r="86"/>
+    <circle cx="240" cy="180" r="86" transform="rotate(45 240 180)"/>
+    <circle cx="560" cy="180" r="86"/>
+    <circle cx="400" cy="340" r="86"/>
+  </g>
+  <g fill="#D9A34A" opacity="0.85">
+    <polygon points="240,94 278,142 326,180 278,218 240,266 202,218 154,180 202,142"/>
+    <polygon points="560,94 598,142 646,180 598,218 560,266 522,218 474,180 522,142"/>
+    <polygon points="400,254 438,302 486,340 438,378 400,426 362,378 314,340 362,302"/>
+  </g>
+  <g fill="#B4462F">
+    <circle cx="240" cy="180" r="26"/>
+    <circle cx="560" cy="180" r="26"/>
+    <circle cx="400" cy="340" r="26"/>
+  </g>
+  <g fill="#4E7C59">
+    <circle cx="400" cy="180" r="16"/>
+    <circle cx="240" cy="340" r="16"/>
+    <circle cx="560" cy="340" r="16"/>
+  </g>
+  <g stroke="#1E5F74" stroke-width="3" opacity="0.7">
+    <line x1="76" y1="180" x2="154" y2="180"/>
+    <line x1="326" y1="180" x2="474" y2="180"/>
+    <line x1="646" y1="180" x2="724" y2="180"/>
+    <line x1="76" y1="340" x2="314" y2="340"/>
+    <line x1="486" y1="340" x2="724" y2="340"/>
+  </g>
+</svg>

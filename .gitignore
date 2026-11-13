@@ -1,0 +1,25 @@
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.iml
+.idea/
+.vscode/
+
+# Local build artefacts & secrets
+android/key.properties
+android/local.properties
+*.jks
+*.keystore
+*.p12
+build/preview/
+coverage/
+
+# Python caches from the content tools
+__pycache__/
+*.pyc
+
+# Diagnostics written by the layout tests
+layout-report.txt
