@@ -20,3 +20,6 @@ coverage/
 # Python caches from the content tools
 __pycache__/
 *.pyc
+
+# Diagnostics written by the layout tests
+layout-report.txt
