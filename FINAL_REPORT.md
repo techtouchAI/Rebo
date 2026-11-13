@@ -52,11 +52,23 @@
 أُصلح الاختبار ليقود النافذة عبر `tester.view` فأصبح `MediaQuery` مطابقاً للتخطيط، وأُضيف
 `test/layout_test.dart` يفحص كل شاشة من الشاشات الاثنتي عشرة على 390 بكسل ويرصد أي تجاوز بسلسلة منشئه.
 
-## 6. حالة CI
+## 6. حالة CI والفحص العملي للمخرجات
 
-- السجل: تشغيل GitHub Actions رقم `43401511187` على الفرع `arena/2338fb28-rebo` (التزام `bed7807`).
+- السجل: تشغيل GitHub Actions رقم `43404680670` على الفرع `arena/2338fb28-rebo`.
 - الوظائف الأربع ناجحة: تحقق المحتوى، التحليل والاختبارات، APK، حزمة ويندوز.
-- بصمات SHA-256 تُولَّد مع كل أثر داخل CI (`dist/SHA256SUMS.txt`).
+
+**فحص المخرج النهائي داخل CI (لا مجرد نجاح بناء):**
+
+| الفحص | ما تحقق فعلياً |
+| --- | --- |
+| `Verify the packaged APK` | `aapt dump badging`: الحزمة `com.techtouchai.mirsam`، `minSdk 24`، `targetSdk 36`، وجود التسمية؛ وتأكيد وجود ملفات المحتوى والخطوط والرسوم واللوحات داخل `flutter_assets`، و`libapp.so` و`libflutter.so` لمعمارية `arm64-v8a` |
+| `Verify the Windows distribution folder` | محتوى ZIP: `mirsam.exe` + `flutter_windows.dll` + `data\flutter_assets\…` (JSON المحتوى، الخطوط، الرسوم، اللوحات) |
+| `Smoke test the Windows executable` | تشغيل `mirsam.exe` فعلياً على مشغّل ويندوز: بقي حياً 20 ثانية وأنشأ نافذة (`MainWindowHandle ≠ 0`) ثم أُغلق |
+| أثر APK | `mirsam-android-apk` — 27.7 ميغابايت |
+| أثر ويندوز | `mirsam-windows-x64` — 13.9 ميغابايت (مجلد التوزيع كاملاً) |
+
+- بصمات SHA-256 تُولَّد مع كل أثر داخل CI (`dist/SHA256SUMS.txt`)، مع `dist/BUILD-INFO.txt` (الاسم، الإصدار، الالتزام، إصدار Flutter، وقت البناء).
+- فحص APK هنا بنيوي (بيانات الحزمة والموارد)، لأن تشغيله يحتاج جهازاً أو محاكياً؛ التشغيل الفعلي لويندوز تم على مشغّل CI.
 
 ## 7. مخرجات البناء
 
