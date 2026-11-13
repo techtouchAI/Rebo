@@ -117,11 +117,52 @@ jobs:
           git config --global --add safe.directory "$HOME/flutter"
       - name: Build the release APK
         run: flutter build apk --release
+      - name: Verify the packaged APK
+        run: |
+          set -euo pipefail
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          ls -l "$APK"
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          BUILD_TOOLS="$(ls -d "$SDK"/build-tools/* | sort -V | tail -1)"
+          echo "build-tools: $BUILD_TOOLS"
+          "$BUILD_TOOLS/aapt" dump badging "$APK" > /tmp/badging.txt
+          head -12 /tmp/badging.txt
+          grep -q "package: name='com.techtouchai.mirsam'" /tmp/badging.txt
+          grep -q "sdkVersion:'24'" /tmp/badging.txt
+          grep -q "targetSdkVersion:'36'" /tmp/badging.txt
+          grep -q "application-label:" /tmp/badging.txt
+          for asset in \
+            assets/content/curriculum.json \
+            assets/content/lessons.json \
+            assets/content/glossary.json \
+            assets/content/plates.json \
+            assets/fonts/Almarai-Regular.ttf \
+            assets/fonts/Amiri-Regular.ttf \
+            assets/illustrations/studio.svg \
+            assets/illustrations/perspective.svg \
+            assets/images/plates/plate-08.jpg \
+            assets/images/plates/plate-19.jpg ; do
+            if ! unzip -l "$APK" | grep -q "flutter_assets/$asset"; then
+              echo "::error::the APK is missing $asset"
+              exit 1
+            fi
+          done
+          unzip -l "$APK" | grep -q "lib/arm64-v8a/libapp.so"
+          unzip -l "$APK" | grep -q "lib/arm64-v8a/libflutter.so"
+          echo "::notice::APK verified: package, SDK levels, label and all bundled assets are present"
       - name: Copy the artifacts
         run: |
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-release.apk "dist/mirsam-${GITHUB_SHA::7}.apk"
           sha256sum dist/*.apk > dist/SHA256SUMS.txt
+          {
+            echo "name: mirsam"
+            echo "package: com.techtouchai.mirsam"
+            echo "version: 1.0.0+1"
+            echo "commit: $GITHUB_SHA"
+            echo "flutter: $FLUTTER_VERSION"
+            echo "built: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > dist/BUILD-INFO.txt
           ls -l dist
       - uses: actions/upload-artifact@v4
         with:
@@ -257,6 +298,62 @@ jobs:
           Get-ChildItem $out | Select-Object Name, Length | Format-Table | Out-String | Write-Host
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
           "$hash  $([System.IO.Path]::GetFileName($zip))" | Out-File -Encoding ascii dist\SHA256SUMS.txt
+          @(
+            'name: mirsam',
+            'binary: mirsam.exe',
+            'version: 1.0.0+1',
+            "commit: $env:GITHUB_SHA",
+            "flutter: $env:FLUTTER_VERSION",
+            "built: $((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))"
+          ) | Out-File -Encoding utf8 dist\BUILD-INFO.txt
+      - name: Verify the Windows distribution folder
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = Get-ChildItem dist\*.zip | Select-Object -First 1
+          $entries = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName).Entries |
+            ForEach-Object { $_.FullName.Replace('/', '\') }
+          $required = @(
+            'mirsam.exe',
+            'flutter_windows.dll',
+            'data\flutter_assets\assets\content\curriculum.json',
+            'data\flutter_assets\assets\fonts\Almarai-Regular.ttf',
+            'data\flutter_assets\assets\illustrations\studio.svg',
+            'data\flutter_assets\assets\images\plates\plate-08.jpg'
+          )
+          foreach ($item in $required) {
+            if ($entries -notcontains $item) {
+              Write-Host "::error::the Windows archive is missing $item"
+              exit 1
+            }
+          }
+          Write-Host "::notice::Windows archive verified with $($entries.Count) entries incl. the Flutter engine, data folder and content assets"
+      - name: Smoke test the Windows executable
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $exe = 'build\windows\x64\runner\Release\mirsam.exe'
+          $stdout = Join-Path $env:RUNNER_TEMP 'mirsam-out.log'
+          $stderr = Join-Path $env:RUNNER_TEMP 'mirsam-err.log'
+          Write-Host "Launching $exe"
+          $process = Start-Process -FilePath $exe -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          $handle = 0
+          for ($i = 0; $i -lt 20; $i++) {
+            Start-Sleep -Seconds 1
+            $process.Refresh()
+            if ($process.HasExited) { break }
+            $handle = $process.MainWindowHandle
+            if ($handle -ne 0) { break }
+          }
+          $process.Refresh()
+          if ($process.HasExited) {
+            Write-Host "::error::mirsam.exe exited during the first 20 seconds with code $($process.ExitCode)"
+            Get-Content $stdout, $stderr -ErrorAction SilentlyContinue | Select-Object -Last 40 | ForEach-Object { Write-Host "::error::$_" }
+            exit 1
+          }
+          Write-Host "::notice::mirsam.exe stayed alive for 20s (pid $($process.Id), window handle $handle)"
+          Get-Process -Id $process.Id | Select-Object ProcessName, WorkingSet64, MainWindowTitle | Format-List | Out-String | Write-Host
+          Stop-Process -Id $process.Id -Force
       - uses: actions/upload-artifact@v4
         with:
           name: mirsam-windows-x64
