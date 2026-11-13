@@ -423,7 +423,7 @@
         '<h3>بنك الأسئلة</h3><p>' + arDigit(questions) + ' سؤالًا بتصحيح فوري.</p></button>' +
       '</div>';
 
-    html += '<div class="section-head"><h2>خطط الدروس</h2><span class="link" data-go="plans">الكل ←</span></div>' +
+    if (scopePlans().length) html += '<div class="section-head"><h2>خطط الدروس</h2><span class="link" data-go="plans">الكل ←</span></div>' +
       '<div class="unit-list">' + scopePlans().slice(0, 3).map(function (p) {
         return '<button class="toc-row" data-plan="' + esc(p.name) + '">' +
           '<span class="n">◇</span>' +
@@ -456,8 +456,9 @@
       '<h2 style="font-size:1.375rem;margin:.5rem 0 .25rem">' +
       (grade ? 'كل ما في ' + esc(gmeta(grade).short) + ' المتوسط' : 'كل ما في الدليل') + '</h2>' +
       '<p style="font-size:.8125rem;color:var(--text-mute);margin-bottom:1rem">' +
-      arDigit(units.length) + ' وحدات و' + arDigit(scopePlans().length) +
-      ' خطة درس، مرتّبة حسب الوحدة.</p>';
+      arDigit(units.length) + ' وحدات' +
+      (scopePlans().length ? ' و' + arDigit(scopePlans().length) + ' خطة درس' : '') +
+      '، مرتّبة حسب الوحدة.</p>';
     html += '<div class="toc-list">';
     units.forEach(function (u) {
       html += '<button class="toc-row" data-unit="' + u.id + '">' +
@@ -467,14 +468,17 @@
         arDigit(u.mcq.length + u.truefalse.length) + ' سؤالًا · ص ' + arDigit(u.pages || '—') + '</span></span></button>';
     });
     html += '</div>';
-    html += '<div class="section-head"><h2>خطط الدروس الأسبوعية</h2></div><div class="toc-list">';
-    scopePlans().forEach(function (p) {
+    var plans = scopePlans();
+    if (plans.length) {
+      html += '<div class="section-head"><h2>خطط الدروس الأسبوعية</h2></div><div class="toc-list">';
+      plans.forEach(function (p) {
       html += '<button class="toc-row" data-plan="' + esc(p.name) + '"><span class="n">◇</span>' +
         '<span class="tr-body"><span class="t">' + esc(p.title) + '</span>' +
         '<span class="m">' + esc(p.kind || 'خطة') + ' · ' + arDigit((p.specific || []).length) + ' هدفًا</span></span>' +
         '<span class="pill chip-amber">خطة</span></button>';
-    });
-    html += '</div>';
+      });
+      html += '</div>';
+    }
     return html;
   }
 
@@ -601,6 +605,14 @@
       '<h2 class="page-title">خطط دروس جاهزة للتنفيذ</h2>' +
       '<p style="font-size:.8125rem;line-height:1.8;color:var(--text-mute);margin-bottom:1.1rem">' +
       'خطط ' + esc(gmeta(activeGrade()).short) + ' المتوسط: الموضوع، الأهداف العامة والخاصة، الوسائل، المقدمة، والعرض.</p>';
+    if (!scopePlans().length) {
+      return html + '<div class="set-card" style="text-align:center;padding:1.6rem 1.2rem">' +
+        '<p style="font-size:.8125rem;line-height:1.9;color:var(--text-dim)">' +
+        'خطط الدروس في هذا الدليل مكتوبة لصفوف أخرى، ولذلك لا تظهر هنا احترامًا لاختيارك ' +
+        '«الصف ' + esc(gmeta(activeGrade()).short) + ' المتوسط». ' +
+        'وحدات صفّك وأسئلتها كاملة في الفهرس.</p>' +
+        '<div style="margin-top:1rem"><button class="btn" data-go="index">فهرس صفّي</button></div></div>';
+    }
     html += '<div class="plan-grid">' + scopePlans().map(function (p) {
       return '<button class="plan-card" data-plan="' + esc(p.name) + '">' +
         '<span class="pill ' + (p.kind === 'عملي' ? 'chip-blue' : p.kind === 'تهيئة' ? 'chip-amber' : 'chip-teal') + '">' + esc(p.kind || 'خطة') + '</span>' +
@@ -617,6 +629,14 @@
   function viewPlan(params) {
     var p = C.plans.filter(function (x) { return x.name === params.id; })[0];
     if (!p) return '<div class="empty">الخطة غير موجودة.</div>';
+    if (scopePlans().indexOf(p) < 0) {
+      return '<div class="empty" style="text-align:center;padding:2.5rem 1.25rem">' +
+        '<span class="eyebrow">خارج نطاق صفّك</span>' +
+        '<h2 style="font-size:1.1875rem;margin:.6rem 0 .4rem">هذه الخطة لصفٍّ آخر</h2>' +
+        '<p style="font-size:.8125rem;color:var(--text-mute);line-height:1.9;margin-bottom:1.1rem">' +
+        'خطط «' + esc(p.grade) + '» لا تظهر في الصف ' + esc(gmeta(activeGrade()).short) +
+        ' المتوسط.</p><button class="btn" data-go="settings">تغيير الصف</button></div>';
+    }
     var html = '<div class="unit-hero uh-plain plan-hero">' +
       '<div class="uh-grad"></div><div class="uh-body">' +
       '<span class="pill chip-teal">خطة أسبوعية · ' + esc(p.kind || '') + '</span>' +
