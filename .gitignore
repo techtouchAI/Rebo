@@ -16,3 +16,7 @@ android/local.properties
 *.p12
 build/preview/
 coverage/
+
+# Python caches from the content tools
+__pycache__/
+*.pyc
