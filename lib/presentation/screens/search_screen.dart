@@ -8,6 +8,7 @@ import '../../core/widgets/empty_state.dart';
 import '../../domain/services/search_service.dart';
 import '../navigation/app_routes.dart';
 import '../state/app_state.dart';
+import '../widgets/text_scale_controls.dart';
 
 /// Instant search across units, lessons, terms and plates.
 class SearchScreen extends StatefulWidget {
@@ -62,6 +63,7 @@ class _SearchScreenState extends State<SearchScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('البحث في المحتوى'),
+        actions: const <Widget>[TextScaleControls()],
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),

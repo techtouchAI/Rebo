@@ -38,16 +38,23 @@ class SearchHit {
 /// The index is built once at start-up from the same JSON that feeds the
 /// reader, therefore a query can never return content that is not in the app.
 class SearchService {
-  SearchService(this.library) {
+  SearchService(this.library, {this.unitFilter}) {
     _buildIndex();
   }
 
   final Library library;
 
+  /// When set, only entries of these units (plus the shared lesson plans) are
+  /// indexed — the grade picker uses it to keep the search inside one grade.
+  final Set<String>? unitFilter;
+
   final List<_IndexEntry> _index = <_IndexEntry>[];
 
   void _buildIndex() {
     for (final unit in library.units) {
+      if (unitFilter != null && !unitFilter!.contains(unit.id)) {
+        continue;
+      }
       _index.add(_IndexEntry(
         type: SearchHitType.unit,
         id: unit.id,
@@ -68,6 +75,9 @@ class SearchService {
       ));
     }
     for (final term in library.glossary) {
+      if (unitFilter != null && !unitFilter!.contains(term.unitId)) {
+        continue;
+      }
       final unit = library.unitById(term.unitId);
       _index.add(_IndexEntry(
         type: SearchHitType.term,
@@ -79,6 +89,9 @@ class SearchService {
       ));
     }
     for (final plate in library.plates) {
+      if (unitFilter != null && !unitFilter!.contains(plate.unitId)) {
+        continue;
+      }
       _index.add(_IndexEntry(
         type: SearchHitType.plate,
         id: plate.id,

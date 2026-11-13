@@ -17,12 +17,19 @@ class AppState extends ChangeNotifier {
     required ProgressRepository progressRepository,
   })  : _progress = progress,
         _progressRepository = progressRepository {
-    search = SearchService(library);
+    search = SearchService(
+      library,
+      unitFilter: progress.gradeId == null ? null : _unitIdsOf(library, progress.gradeId!),
+    );
+  }
+
+  static Set<String> _unitIdsOf(Library library, String gradeId) {
+    return library.unitsOf(gradeId).map((LearningUnit unit) => unit.id).toSet();
   }
 
   final Library library;
   final ProgressRepository _progressRepository;
-  late final SearchService search;
+  late SearchService search;
 
   ReadingProgress _progress;
 
@@ -69,6 +76,113 @@ class AppState extends ChangeNotifier {
   static const double MinTextScale = 0.9;
   static const double MaxTextScale = 1.5;
 
+  // ---------------------------------------------------------------- grade ---
+
+  /// The grade chosen on first launch. Null means the picker is shown.
+  String? get gradeId => _progress.gradeId;
+
+  bool get hasGrade => _progress.gradeId != null;
+
+  ContentSection? get gradeSection {
+    final id = _progress.gradeId;
+    if (id == null) {
+      return null;
+    }
+    for (final section in library.sections) {
+      if (section.kind == 'grade' && section.id == id) {
+        return section;
+      }
+    }
+    return null;
+  }
+
+  /// The three grade sections offered by the picker.
+  List<ContentSection> get gradeSections {
+    return library.sections.where((section) => section.kind == 'grade').toList(growable: false);
+  }
+
+  String get gradeTitle => gradeSection?.title ?? 'كل الصفوف';
+
+  /// Units of the selected grade only; everything else stays out of the UI.
+  List<LearningUnit> get visibleUnits {
+    final id = _progress.gradeId;
+    if (id == null) {
+      return library.units;
+    }
+    return library.unitsOf(id);
+  }
+
+  Set<String> get visibleUnitIds => visibleUnits.map((unit) => unit.id).toSet();
+
+  /// Previous / next order limited to the material the learner can see.
+  List<String> get visibleReadingOrder {
+    final ids = <String>[];
+    for (final section in visibleSections) {
+      if (section.kind == 'grade' || section.kind == 'intro') {
+        for (final unit in library.unitsOf(section.id)) {
+          ids.add(unit.id);
+        }
+      }
+    }
+    return ids;
+  }
+
+  /// Sections shown in the index: the chosen grade, then the shared material.
+  List<ContentSection> get visibleSections {
+    final section = gradeSection;
+    final result = <ContentSection>[
+      ...library.sections.where((item) => item.kind == 'intro'),
+      if (section != null) section,
+      ...library.sections.where((item) => item.kind == 'lessons' || item.kind == 'plates'),
+    ];
+    return result;
+  }
+
+  /// General introduction, always reachable from the home page.
+  LearningUnit? get introductionUnit {
+    for (final unit in library.units) {
+      if (unit.isIntroduction) {
+        return unit;
+      }
+    }
+    return null;
+  }
+
+  List<Plate> get visiblePlates {
+    final id = _progress.gradeId;
+    if (id == null) {
+      return library.plates;
+    }
+    // Plates belong to grade units; the shared appendix plates (not tied to a
+    // grade unit) stay available for every grade.
+    final gradeUnitIds = library.units
+        .where((LearningUnit unit) => !unit.isIntroduction)
+        .map((LearningUnit unit) => unit.id)
+        .toSet();
+    final visible = visibleUnitIds;
+    return library.plates
+        .where((plate) => visible.contains(plate.unitId) || !gradeUnitIds.contains(plate.unitId))
+        .toList(growable: false);
+  }
+
+  List<GlossaryTerm> get visibleGlossary {
+    final id = _progress.gradeId;
+    if (id == null) {
+      return library.glossary;
+    }
+    return library.glossary.where((term) => visibleUnitIds.contains(term.unitId)).toList(growable: false);
+  }
+
+  Future<void> setGrade(String? gradeId) async {
+    _progress.gradeId = gradeId;
+    search = SearchService(
+      library,
+      unitFilter: gradeId == null ? null : _unitIdsOf(library, gradeId),
+    );
+    notifyListeners();
+    await _persist();
+  }
+
   // ------------------------------------------------------------- progress ---
 
   bool isFavorite(String id) => _progress.isFavorite(id);
@@ -77,17 +191,23 @@ class AppState extends ChangeNotifier {
 
   String? get lastReadUnitId => _progress.lastUnitId;
 
+  /// Last unit opened, as long as it still belongs to the chosen grade.
   LearningUnit? get lastReadUnit {
     final id = _progress.lastUnitId;
     if (id == null) {
       return null;
     }
-    return library.unitById(id);
+    final unit = library.unitById(id);
+    if (unit == null) {
+      return null;
+    }
+    return visibleUnitIds.contains(unit.id) ? unit : null;
   }
 
-  int get readUnitsCount => _progress.readCount;
+  /// Read units inside the visible material only.
+  int get readUnitsCount => visibleUnits.where((unit) => _progress.isRead(unit.id)).length;
 
-  int get totalUnits => library.units.length;
+  int get totalUnits => visibleUnits.length;
 
   double get overallProgress {
     if (totalUnits == 0) {
@@ -110,7 +230,7 @@ class AppState extends ChangeNotifier {
   }
 
   List<LearningUnit> get favoriteUnits {
-    return library.units.where((unit) => _progress.isFavorite(unit.id)).toList(growable: false);
+    return visibleUnits.where((unit) => _progress.isFavorite(unit.id)).toList(growable: false);
   }
 
   List<LessonPlan> get favoriteLessons {
@@ -167,7 +287,9 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> resetProgress() async {
-    _progress = ReadingProgress();
+    // The chosen grade is a display setting, not reading data: keep it so the
+    // learner is not pushed back to the picker.
+    _progress = ReadingProgress(gradeId: _progress.gradeId);
     notifyListeners();
     await _persist();
   }

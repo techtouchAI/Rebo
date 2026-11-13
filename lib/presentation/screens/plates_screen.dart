@@ -7,6 +7,7 @@ import '../../core/widgets/section_header.dart';
 import '../../domain/models/library.dart';
 import '../navigation/app_routes.dart';
 import '../state/app_state.dart';
+import '../widgets/text_scale_controls.dart';
 
 /// Gallery of the scanned plates of the teacher guide.
 class PlatesScreen extends StatelessWidget {
@@ -16,9 +17,12 @@ class PlatesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final theme = Theme.of(context);
-    final plates = state.library.plates;
+    final plates = state.visiblePlates;
     return Scaffold(
-      appBar: AppBar(title: const Text('لوحات من دليل المعلم')),
+      appBar: AppBar(
+        title: const Text('لوحات من دليل المعلم'),
+        actions: const <Widget>[TextScaleControls()],
+      ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
         children: <Widget>[

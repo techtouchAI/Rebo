@@ -81,7 +81,7 @@ class _IndexScreenState extends State<IndexScreen> {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xl),
-                ...library.sections.map(
+                ...state.visibleSections.map(
                   (ContentSection section) => _SectionBlock(
                     section: section,
                     state: state,
@@ -157,7 +157,7 @@ class _SectionBlock extends StatelessWidget {
         title: section.title,
         subtitle: section.subtitle,
         icon: Icons.image_outlined,
-        entries: state.library.plates
+        entries: state.visiblePlates
             .map((Plate plate) => _ExtraEntry(
                   title: plate.title,
                   subtitle: '${plate.grade} — ${plate.caption}',

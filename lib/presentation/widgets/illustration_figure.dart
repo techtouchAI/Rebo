@@ -65,34 +65,63 @@ class IllustrationFigure extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Icon(Icons.brush_outlined, size: 16, color: accent),
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(Icons.brush_outlined, size: 16, color: accent),
+            ),
             const SizedBox(width: 6),
+            // The caption and its zoom action stay on one line: at 390 px the
+            // text shrinks slightly instead of breaking into a tall column.
             Expanded(
-              child: Text(
-                figure.caption,
-                style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13.5),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  figure.caption,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13.5, height: 1.5),
+                ),
               ),
             ),
-            TextButton.icon(
+            IconButton(
+              tooltip: 'تكبير الرسم',
+              visualDensity: VisualDensity.compact,
               onPressed: () => showIllustrationDialog(
                 context,
                 asset: figure.asset,
                 caption: figure.caption,
                 legend: figure.legend,
               ),
-              icon: const Icon(Icons.zoom_out_map, size: 16),
-              label: const Text('تكبير'),
+              icon: Icon(Icons.zoom_out_map, size: 18, color: accent),
             ),
           ],
         ),
-        if (figure.legend.isNotEmpty)
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.xs,
-            children: figure.legend
-                .map((legend) => _LegendChip(legend: legend))
-                .toList(growable: false),
+        if (figure.legend.isNotEmpty) ...<Widget>[
+          const SizedBox(height: AppSpacing.xs),
+          // The legend always stays on a single line: the row shrinks instead
+          // of wrapping onto a second line on narrow phones.
+          LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              return SizedBox(
+                width: constraints.maxWidth,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      for (int index = 0; index < figure.legend.length; index++) ...<Widget>[
+                        if (index > 0) const SizedBox(width: AppSpacing.sm),
+                        _LegendChip(legend: figure.legend[index]),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
+        ],
       ],
     );
   }

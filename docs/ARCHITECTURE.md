@@ -24,7 +24,7 @@ lib/
     ├── state/app_state.dart   ChangeNotifier واحد + AppScope (InheritedNotifier)
     ├── state/bootstrap.dart   تحميل المحتوى، شاشة بداية، شاشة خطأ
     ├── navigation/app_routes.dart
-    ├── screens/               10 شاشات + الهيكل العام
+    ├── screens/               13 شاشة + الهيكل العام (منها اختيار الصف)
     └── widgets/               IllustrationFigure, TopicCard, unit_sections
 ```
 
@@ -33,6 +33,8 @@ lib/
 1. `main()` يثبّت الاتجاه العام ويشغّل `MirsamBootstrap`.
 2. `MirsamBootstrap` يحمّل بالتوازي: `AssetContentRepository.load()` و`PrefsProgressRepository.load()`.
 3. عند النجاح: `AppState(library, progress, repository)` ثم `AppScope` ثم `MirsamApp`.
+   إن لم يكن `progress.gradeId` محفوظاً (أول تشغيل) يفتح `MirsamApp` شاشة `GradePickerScreen`،
+   وبعد اختيار الصف تُستبدل بـ `LandingShell`.
 4. أثناء التحميل تظهر شاشة بداية بهوية التطبيق، وعند الفشل شاشة خطأ عربية بالسبب.
 5. في الاختبارات يُحقن `MemoryProgressRepository` و`FileContentRepository`، لذا تُجرّب الشجرة نفسها
    التي تعمل في الإنتاج.
@@ -56,9 +58,20 @@ lib/
   "scrollOffsets": {"g2-u1": 812.0},
   "quizScores": {"g1-u1": 6},
   "themeMode": "system",
-  "textScale": 1.0
+  "textScale": 1.0,
+  "gradeId": "g1"
 }
 ```
+
+## الصف الدراسي كمرشّح وحيد
+
+- `ReadingProgress.gradeId` (`g1|g2|g3|null`) هو المصدر الوحيد لتصفية المحتوى، ويُحفظ مع بقية التقدّم.
+- `AppState` يوفّر: `gradeId`, `hasGrade`, `gradeSection`, `gradeTitle`, `gradeSections`, `setGrade`,
+  و`visibleUnits`, `visibleUnitIds`, `visibleSections`, `visibleReadingOrder`, `visiblePlates`,
+  `visibleGlossary`, إضافة إلى `totalUnits`, `readUnitsCount`, `favoriteUnits`, `lastReadUnit` المشتقة منها.
+- `setGrade` يعيد بناء `SearchService` بمرشّح `unitFilter` (وحدات الصف + الدروس المشتركة)، و`setGrade(null)`
+  يعيد الفهرس الكامل (يُستخدم في الاختبارات فقط).
+- «إعادة تعيين البيانات» تُبقي `gradeId` لأن اختيار الصف إعداد عرض لا بيانات قراءة.
 
 ## المحتوى والبحث
 
@@ -87,6 +100,10 @@ lib/
 - **الرسوم**: `IllustrationFigure` يعرض SVG من الحزمة بحد أقصى للارتفاع، وخطاطيف `textDirection: rtl`،
   ومربّع حوار للتكبير، ووسيلة إيضاح ملوّنة من `legend` في JSON.
 - **المقاسات**: `AppLayout.pageMaxWidth = 1240`، `readingMaxWidth = 860`، `railBreakpoint = 940`.
+- **الترويسة**: `AppPageHeader` يضع على الهاتف صفّاً علوياً مستقلاً (الشعار + الأدوات + `TextScaleControls`)
+  ثم كتلة العنوان/العنوان الفرعي تحته، وعلى الشاشات العريضة صفّاً واحداً موسّعاً — فلا تتزاحم العناصر.
+- **حجم الخط**: `TextScaleControls` (تكبير/تصغير) مركّب في `AppPageHeader` و`AppBar` لكل شاشة، ويتصرّف على
+  `AppState.setTextScale` نفسه المستخدم في شريط الإعدادات.
 - **السمة**: ألوان مستوحاة من خامات الصف الفني (طين `#B4462F`، نيلي `#1E5F74`، مغرة `#D9A34A`،
   أخضر `#4E7C59`، ورق `#F7F1E6`)، خط **Almarai** للنصوص و**Amiri** للعناوين، وكلاهما بترخيص OFL.
 
@@ -105,7 +122,8 @@ lib/
 | `glossary_screen` | المصطلحات وتعريفاتها وروابط وحداتها |
 | `search_screen` | بحث فوري مع تصفية بالنوع |
 | `favorites_screen` | المحفوظات (وضع مدمج داخل الهيكل) |
-| `settings_screen` | المظهر، حجم الخط، سجل التقدّم، عن المحتوى (وضع مدمج) |
+| `settings_screen` | الصف الدراسي، المظهر، حجم الخط، سجل التقدّم، عن المحتوى (وضع مدمج) |
+| `grade_picker_screen` | اختيار الصف في أول تشغيل (وثالثة بطاقات للصفوف الثلاثة) |
 
 ## قيود مقصودة
 

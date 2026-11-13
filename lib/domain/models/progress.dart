@@ -28,6 +28,7 @@ class ReadingProgress {
     Map<String, int>? quizScores,
     this.themeMode = AppThemeMode.system,
     this.textScale = 1.0,
+    this.gradeId,
   })  : favorites = favorites ?? <String>{},
         readUnits = readUnits ?? <String>{},
         scrollOffsets = scrollOffsets ?? <String, double>{},
@@ -40,6 +41,9 @@ class ReadingProgress {
   final Map<String, int> quizScores;
   AppThemeMode themeMode;
   double textScale;
+
+  /// The grade chosen on first launch (`g1`, `g2`, `g3`); null shows the picker.
+  String? gradeId;
 
   bool isFavorite(String id) => favorites.contains(id);
   bool isRead(String id) => readUnits.contains(id);
@@ -55,6 +59,7 @@ class ReadingProgress {
       quizScores: Map<String, int>.from(quizScores),
       themeMode: themeMode,
       textScale: textScale,
+      gradeId: gradeId,
     );
   }
 
@@ -67,6 +72,7 @@ class ReadingProgress {
       'quizScores': quizScores,
       'themeMode': themeMode.name,
       'textScale': textScale,
+      'gradeId': gradeId,
     };
   }
 
@@ -79,6 +85,7 @@ class ReadingProgress {
       quizScores: _intMap(json['quizScores']),
       themeMode: AppThemeMode.parse(json['themeMode'] as String?),
       textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
+      gradeId: json['gradeId'] as String?,
     );
   }
 

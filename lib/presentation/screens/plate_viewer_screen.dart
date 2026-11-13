@@ -4,6 +4,7 @@ import '../../core/theme/dimens.dart';
 import '../../domain/models/library.dart';
 import '../state/app_state.dart';
 import 'unit_screen.dart';
+import '../widgets/text_scale_controls.dart';
 
 /// Full-screen zoomable view of a scanned plate, with its source reference.
 class PlateViewerScreen extends StatelessWidget {
@@ -33,6 +34,7 @@ class PlateViewerScreen extends StatelessWidget {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: Text(selected.title, style: const TextStyle(fontSize: 16)),
+        actions: const <Widget>[TextScaleControls()],
       ),
       body: Column(
         children: <Widget>[

@@ -8,6 +8,7 @@ import '../../domain/models/library.dart';
 import '../navigation/app_routes.dart';
 import '../state/app_state.dart';
 import 'landing_shell.dart';
+import '../widgets/text_scale_controls.dart';
 
 /// Saved units and lessons.
 class FavoritesScreen extends StatelessWidget {
@@ -122,7 +123,10 @@ class FavoritesScreen extends StatelessWidget {
 
     if (!embedded) {
       return Scaffold(
-        appBar: AppBar(title: const Text('المفضلة')),
+        appBar: AppBar(
+          title: const Text('المفضلة'),
+          actions: const <Widget>[TextScaleControls()],
+        ),
         body: ListView(
           padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
           children: <Widget>[AppPage(child: body)],

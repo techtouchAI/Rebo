@@ -11,6 +11,7 @@ import '../../domain/models/library.dart';
 import '../../domain/models/progress.dart';
 import '../navigation/app_routes.dart';
 import '../state/app_state.dart';
+import 'grade_picker_screen.dart';
 import 'landing_shell.dart';
 
 /// Landing page: identity, progress, continue-reading, sections and shortcuts.
@@ -28,9 +29,16 @@ class HomeScreen extends StatelessWidget {
         children: <Widget>[
           AppPageHeader(
             title: 'مِرسم',
-            subtitle: 'التربية الفنية • المرحلة المتوسطة',
+            subtitle: 'التربية الفنية • ${state.gradeTitle}',
             showBrand: true,
             actions: <Widget>[
+              IconButton(
+                tooltip: 'تغيير الصف',
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const GradePickerScreen()),
+                ),
+                icon: const Icon(Icons.school_outlined),
+              ),
               IconButton(
                 tooltip: 'بحث',
                 onPressed: () => AppRoutes.openSearch(context),
@@ -307,14 +315,14 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalTopics = state.library.units.fold<int>(0, (int sum, LearningUnit unit) => sum + unit.topics.length);
-    final totalQuestions =
-        state.library.units.fold<int>(0, (int sum, LearningUnit unit) => sum + unit.questions.length);
+    final units = state.visibleUnits.where((LearningUnit unit) => !unit.isIntroduction).toList(growable: false);
+    final totalTopics = units.fold<int>(0, (int sum, LearningUnit unit) => sum + unit.topics.length);
+    final totalQuestions = units.fold<int>(0, (int sum, LearningUnit unit) => sum + unit.questions.length);
     final items = <_Stat>[
-      _Stat('وحدة دراسية', toArabicDigits('${state.library.units.length - 1}'), Icons.menu_book_outlined),
+      _Stat('وحدة دراسية', toArabicDigits('${units.length}'), Icons.menu_book_outlined),
       _Stat('موضوعاً', toArabicDigits('$totalTopics'), Icons.subject_outlined),
       _Stat('سؤال مراجعة', toArabicDigits('$totalQuestions'), Icons.quiz_outlined),
-      _Stat('لوحة مصوّرة', toArabicDigits('${state.library.plates.length}'), Icons.image_outlined),
+      _Stat('لوحة مصوّرة', toArabicDigits('${state.visiblePlates.length}'), Icons.image_outlined),
     ];
     return Wrap(
       spacing: AppSpacing.md,
@@ -375,7 +383,7 @@ class _SectionsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sections = state.library.sections;
+    final sections = state.visibleSections;
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         final columns = constraints.maxWidth >= 980
@@ -419,7 +427,7 @@ class _SectionCard extends StatelessWidget {
     };
     final count = switch (section.kind) {
       'lessons' => state.library.lessons.length,
-      'plates' => state.library.plates.length,
+      'plates' => state.visiblePlates.length,
       _ => state.library.unitsOf(section.id).length,
     };
     final progress = section.isGrade ? state.sectionProgress(section.id) : null;

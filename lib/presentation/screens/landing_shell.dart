@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/dimens.dart';
 import '../state/app_state.dart';
+import '../widgets/text_scale_controls.dart';
 import 'favorites_screen.dart';
 import 'home_screen.dart';
 import 'index_screen.dart';
@@ -140,7 +141,41 @@ class AppPageHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final width = MediaQuery.sizeOf(context).width;
+    final narrow = width < 640;
     final useRail = width >= AppLayout.railBreakpoint;
+
+    final titleBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.headlineLarge?.copyWith(fontSize: narrow ? 24 : null),
+        ),
+        if (subtitle != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              subtitle!,
+              maxLines: narrow ? 2 : 3,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(fontSize: narrow ? 13 : null),
+            ),
+          ),
+      ],
+    );
+
+    final topRow = Row(
+      children: <Widget>[
+        if (showBrand) _BrandMark(compact: narrow),
+        const Spacer(),
+        ...actions,
+        const TextScaleControls(),
+      ],
+    );
+
     return Padding(
       padding: EdgeInsets.only(
         top: MediaQuery.paddingOf(context).top + AppSpacing.lg,
@@ -148,28 +183,27 @@ class AppPageHeader extends StatelessWidget {
         right: AppSpacing.xl,
         bottom: AppSpacing.md,
       ),
-      child: Row(
-        children: <Widget>[
-          if (showBrand && !useRail) ...<Widget>[
-            _BrandMark(),
-            const SizedBox(width: AppSpacing.lg),
-          ],
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: narrow
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                Text(title, style: theme.textTheme.headlineLarge),
-                if (subtitle != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(subtitle!, style: theme.textTheme.bodyMedium),
-                  ),
+                topRow,
+                const SizedBox(height: AppSpacing.sm),
+                titleBlock,
+              ],
+            )
+          : Row(
+              children: <Widget>[
+                if (showBrand && !useRail) ...<Widget>[
+                  _BrandMark(compact: width < 900),
+                  const SizedBox(width: AppSpacing.lg),
+                ],
+                Expanded(child: titleBlock),
+                ...actions,
+                const SizedBox(width: AppSpacing.xs),
+                const TextScaleControls(),
               ],
             ),
-          ),
-          ...actions,
-        ],
-      ),
     );
   }
 }

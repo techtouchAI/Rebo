@@ -7,6 +7,7 @@ import '../../domain/models/progress.dart';
 import '../navigation/app_routes.dart';
 import '../state/app_state.dart';
 import 'landing_shell.dart';
+import '../widgets/text_scale_controls.dart';
 
 /// Display preferences, progress management and content attribution.
 class SettingsScreen extends StatelessWidget {
@@ -23,6 +24,33 @@ class SettingsScreen extends StatelessWidget {
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        _SettingsCard(
+          title: 'الصف الدراسي',
+          icon: Icons.school_outlined,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: <Widget>[
+                  for (final section in state.gradeSections)
+                    ChoiceChip(
+                      avatar: const Icon(Icons.school_outlined, size: 18),
+                      label: Text(section.title),
+                      selected: state.gradeId == section.id,
+                      onSelected: (_) => state.setGrade(section.id),
+                    ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'المحتوى المعروض الآن: ${state.gradeTitle} فقط، مع المدخل العام والدروس واللوحات المشتركة.',
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
         _SettingsCard(
           title: 'المظهر',
           icon: Icons.palette_outlined,
@@ -143,8 +171,13 @@ class SettingsScreen extends StatelessWidget {
             children: <Widget>[
               const _InfoRow(label: 'الاسم', value: 'مِرسم'),
               const _InfoRow(label: 'الإصدار', value: '1.0.0 (1)'),
-              _InfoRow(label: 'الوحدات', value: toArabicDigits('${state.library.units.length}')),
-              _InfoRow(label: 'اللوحات', value: toArabicDigits('${state.library.plates.length}')),
+              _InfoRow(
+                label: 'الوحدات',
+                value: toArabicDigits(
+                  '${state.visibleUnits.where((unit) => !unit.isIntroduction).length}',
+                ),
+              ),
+              _InfoRow(label: 'اللوحات', value: toArabicDigits('${state.visiblePlates.length}')),
               _InfoRow(label: 'الدروس التطبيقية', value: toArabicDigits('${state.library.lessons.length}')),
               _InfoRow(label: 'المصالح', value: 'Android • Windows'),
             ],
@@ -162,7 +195,10 @@ class SettingsScreen extends StatelessWidget {
 
     if (!embedded) {
       return Scaffold(
-        appBar: AppBar(title: const Text('الإعدادات')),
+        appBar: AppBar(
+          title: const Text('الإعدادات'),
+          actions: const <Widget>[TextScaleControls()],
+        ),
         body: ListView(
           padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
           children: <Widget>[AppPage(maxWidth: AppLayout.readingMaxWidth, child: body)],

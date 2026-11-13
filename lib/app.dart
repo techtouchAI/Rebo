@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/theme/app_theme.dart';
+import 'presentation/screens/grade_picker_screen.dart';
 import 'presentation/screens/landing_shell.dart';
 import 'presentation/state/app_state.dart';
 
@@ -32,7 +33,7 @@ class MirsamApp extends StatelessWidget {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      home: const LandingShell(),
+      home: state.hasGrade ? const LandingShell() : const GradePickerScreen(),
     );
   }
 }

@@ -5,6 +5,7 @@ import '../../core/widgets/app_page.dart';
 import '../../domain/models/library.dart';
 import '../navigation/app_routes.dart';
 import '../state/app_state.dart';
+import '../widgets/text_scale_controls.dart';
 
 /// Glossary of the technical terms with the definitions of the source.
 class GlossaryScreen extends StatelessWidget {
@@ -14,9 +15,12 @@ class GlossaryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final theme = Theme.of(context);
-    final terms = state.library.glossary;
+    final terms = state.visibleGlossary;
     return Scaffold(
-      appBar: AppBar(title: const Text('المصطلحات الفنية')),
+      appBar: AppBar(
+        title: const Text('المصطلحات الفنية'),
+        actions: const <Widget>[TextScaleControls()],
+      ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
         children: <Widget>[

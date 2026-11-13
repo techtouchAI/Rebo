@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mirsam/presentation/screens/favorites_screen.dart';
 import 'package:mirsam/presentation/screens/glossary_screen.dart';
+import 'package:mirsam/presentation/screens/grade_picker_screen.dart';
 import 'package:mirsam/presentation/screens/home_screen.dart';
 import 'package:mirsam/presentation/screens/index_screen.dart';
 import 'package:mirsam/presentation/screens/lesson_screen.dart';
@@ -38,6 +39,10 @@ void main() {
 
   testWidgets('home screen fits a phone', (WidgetTester tester) async {
     await expectFitsPhone(tester, const HomeScreen(), 'home');
+  });
+
+  testWidgets('grade picker fits a phone', (WidgetTester tester) async {
+    await expectFitsPhone(tester, const GradePickerScreen(), 'grade picker');
   });
 
   testWidgets('index screen fits a phone', (WidgetTester tester) async {

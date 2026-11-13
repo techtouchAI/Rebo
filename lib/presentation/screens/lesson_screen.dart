@@ -7,6 +7,7 @@ import '../../core/widgets/meta_pill.dart';
 import '../../domain/models/library.dart';
 import '../state/app_state.dart';
 import '../widgets/illustration_figure.dart';
+import '../widgets/text_scale_controls.dart';
 
 /// Lesson plan reader with a tab per session (theory / practice).
 class LessonScreen extends StatefulWidget {
@@ -48,6 +49,7 @@ class _LessonScreenState extends State<LessonScreen> with SingleTickerProviderSt
             onPressed: () => state.toggleFavorite(lesson.id),
             icon: Icon(isFavorite ? Icons.bookmark : Icons.bookmark_border),
           ),
+          const TextScaleControls(),
         ],
         bottom: TabBar(
           controller: _tabController,

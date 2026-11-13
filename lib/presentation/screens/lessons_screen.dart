@@ -6,6 +6,7 @@ import '../../core/widgets/meta_pill.dart';
 import '../../domain/models/library.dart';
 import '../navigation/app_routes.dart';
 import '../state/app_state.dart';
+import '../widgets/text_scale_controls.dart';
 
 /// Index of the practical lesson plans (theory + practice for each topic).
 class LessonsScreen extends StatelessWidget {
@@ -18,7 +19,10 @@ class LessonsScreen extends StatelessWidget {
     final scheme = theme.colorScheme;
     final lessons = state.library.lessons;
     return Scaffold(
-      appBar: AppBar(title: const Text('دروس تطبيقية')),
+      appBar: AppBar(
+        title: const Text('دروس تطبيقية'),
+        actions: const <Widget>[TextScaleControls()],
+      ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
         children: <Widget>[

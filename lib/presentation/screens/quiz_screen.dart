@@ -6,6 +6,7 @@ import '../../core/widgets/app_page.dart';
 import '../../domain/models/library.dart';
 import '../../domain/models/quiz_session.dart';
 import '../state/app_state.dart';
+import '../widgets/text_scale_controls.dart';
 
 /// Unit self-assessment built only from the questions of the source document.
 class QuizScreen extends StatefulWidget {
@@ -35,7 +36,10 @@ class _QuizScreenState extends State<QuizScreen> {
     final gradable = session.gradable;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('اختبر فهمك')),
+      appBar: AppBar(
+        title: const Text('اختبر فهمك'),
+        actions: const <Widget>[TextScaleControls()],
+      ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
         children: <Widget>[

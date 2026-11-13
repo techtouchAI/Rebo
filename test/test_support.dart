@@ -27,6 +27,9 @@ Future<Library> ensureLibrary() async {
   return _cached!;
 }
 
+/// Grade used by the widget tests unless a test asks for the first launch.
+const String testGrade = 'g1';
+
 AppState buildState({
   required Library library,
   ReadingProgress? progress,
@@ -34,7 +37,7 @@ AppState buildState({
 }) {
   return AppState(
     library: library,
-    progress: progress ?? ReadingProgress(),
+    progress: progress ?? ReadingProgress(gradeId: testGrade),
     progressRepository: repository ?? MemoryProgressRepository(),
   );
 }

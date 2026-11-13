@@ -12,6 +12,7 @@ import '../navigation/app_routes.dart';
 import '../state/app_state.dart';
 import '../widgets/illustration_figure.dart';
 import '../widgets/units/unit_sections.dart';
+import '../widgets/text_scale_controls.dart';
 
 /// Reader of a single curriculum unit.
 class UnitScreen extends StatefulWidget {
@@ -69,7 +70,7 @@ class _UnitScreenState extends State<UnitScreen> {
     }
     final theme = Theme.of(context);
     final accent = AppColors.fromAccent(unit.accent, theme.brightness == Brightness.dark);
-    final order = state.library.readingOrder;
+    final order = state.visibleReadingOrder;
     final position = order.indexOf(unit.id);
     final previous = position > 0 ? state.library.unitById(order[position - 1]) : null;
     final next = position >= 0 && position < order.length - 1
@@ -95,6 +96,7 @@ class _UnitScreenState extends State<UnitScreen> {
             onPressed: () => _copyUnit(state, unit),
             icon: const Icon(Icons.ios_share),
           ),
+          const TextScaleControls(),
           PopupMenuButton<String>(
             tooltip: 'خيارات',
             onSelected: (String value) {
