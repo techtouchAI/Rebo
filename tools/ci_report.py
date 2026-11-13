@@ -137,7 +137,8 @@ def report_test(path: Path, status: int = 0) -> int:
     widget_hits = [
         line
         for line in plain
-        if "error-causing widget" in line.lower()
+        if "LAYOUT-DIAG" in line
+        or "error-causing widget" in line.lower()
         or ("file:///" in line and ".dart:" in line and "test/" not in line)
     ]
     for line in widget_hits[:6]:
