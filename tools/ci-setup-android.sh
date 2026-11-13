@@ -63,9 +63,11 @@ else
     "https://repo1.maven.org/maven2/com/android/tools/build/apksig/${APKSIG_VERSION:-8.6.0}/apksig-${APKSIG_VERSION:-8.6.0}.jar"
 fi
 
-# ecj (the Eclipse batch compiler) is not part of the SDK any more.
+# ecj (the Eclipse batch compiler) is not part of the SDK any more. Its version
+# is pinned because it determines the produced bytecode, and therefore the APK
+# hash: a different compiler gives a different but equally valid package.
 if [ ! -f "$HERE/tools/ecj.jar" ]; then
-  ECJ_VERSION="${ECJ_VERSION:-3.38.0}"
+  ECJ_VERSION="${ECJ_VERSION:-3.45.0}"
   curl -fsSL -o "$HERE/tools/ecj.jar" \
     "https://repo1.maven.org/maven2/org/eclipse/jdt/ecj/${ECJ_VERSION}/ecj-${ECJ_VERSION}.jar"
 fi
