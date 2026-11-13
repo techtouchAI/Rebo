@@ -59,9 +59,8 @@ Future<AppState> pumpApplication(
   final library = await ensureLibrary();
   final state = buildState(library: library, progress: progress);
   tester.view.devicePixelRatio = 1.0;
-  addTearDown(tester.view.resetDevicePixelRatio);
-  await tester.binding.setSurfaceSize(size);
-  addTearDown(() => tester.binding.setSurfaceSize(null));
+  tester.view.physicalSize = size;
+  addTearDown(tester.view.reset);
   await tester.pumpWidget(
     AppScope(
       state: state,
@@ -83,9 +82,8 @@ Future<AppState> pumpScreen(
   final library = await ensureLibrary();
   final state = buildState(library: library, progress: progress);
   tester.view.devicePixelRatio = 1.0;
-  addTearDown(tester.view.resetDevicePixelRatio);
-  await tester.binding.setSurfaceSize(size);
-  addTearDown(() => tester.binding.setSurfaceSize(null));
+  tester.view.physicalSize = size;
+  addTearDown(tester.view.reset);
   await tester.pumpWidget(
     AppScope(
       state: state,

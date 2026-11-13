@@ -29,6 +29,9 @@ List<String> findFlexOverflows(WidgetTester tester) {
     }
     final horizontal = render.direction == Axis.horizontal;
     final limit = horizontal ? render.size.width : render.size.height;
+    if (limit <= 0) {
+      continue;
+    }
     var extent = 0.0;
     RenderBox? child = render.firstChild;
     while (child != null) {
