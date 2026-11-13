@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520">
+  <rect x="0" y="0" width="800" height="520" fill="none"/>
+  <rect x="70" y="70" width="660" height="380" rx="6" fill="#F0DCB4" opacity="0.5"/>
+  <path d="M170 450 L170 300 C170 200 300 140 380 96 C460 140 590 200 590 300 L590 450 Z" fill="#1E5F74"/>
+  <path d="M220 450 L220 310 C220 236 306 190 380 152 C454 190 540 236 540 310 L540 450 Z" fill="#F0DCB4"/>
+  <circle cx="380" cy="286" r="80" fill="#D9A34A"/>
+  <circle cx="380" cy="286" r="52" fill="#B4462F"/>
+  <g stroke="#4E7C59" stroke-width="12" stroke-linecap="round">
+    <line x1="130" y1="452" x2="130" y2="250"/>
+    <path d="M130 258 C90 240 70 200 66 160"/>
+    <path d="M130 258 C170 240 190 200 194 160"/>
+    <path d="M130 258 C130 220 130 200 130 176
+"/>
+  </g>
+  <circle cx="130" cy="250" r="18" fill="#4E7C59"/>
+  <g fill="#3A3A44" opacity="0.85">
+    <circle cx="646" cy="150" r="26"/>
+    <polygon points="600,420 660,320 720,420"/>
+  </g>
+  <rect x="70" y="450" width="660" height="10" fill="#B4462F"/>
+  <path d="M520 380 C564 340 600 360 620 400" fill="none" stroke="#B4462F" stroke-width="8" opacity="0.7"/>
+</svg>
