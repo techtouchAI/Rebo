@@ -19,6 +19,33 @@ enum AppThemeMode {
   }
 }
 
+/// The selectable typefaces. All of them are bundled in the package, so
+/// switching never needs a network connection.
+enum AppFont {
+  almarai('Almarai', 'المراعي'),
+  cairo('Cairo', 'القاهرة'),
+  tajawal('Tajawal', 'تجوال'),
+  plex('IBMPlexSansArabic', 'IBM بلكس'),
+  kufi('NotoKufiArabic', 'كوفي نوتو');
+
+  const AppFont(this.family, this.label);
+
+  /// The `family` name declared in `pubspec.yaml`.
+  final String family;
+
+  /// Arabic name shown in the settings page.
+  final String label;
+
+  static AppFont parse(String? value) {
+    for (final font in AppFont.values) {
+      if (font.name == value) {
+        return font;
+      }
+    }
+    return AppFont.almarai;
+  }
+}
+
 class ReadingProgress {
   ReadingProgress({
     Set<String>? favorites,
@@ -29,6 +56,7 @@ class ReadingProgress {
     this.themeMode = AppThemeMode.system,
     this.textScale = 1.0,
     this.gradeId,
+    this.font = AppFont.almarai,
   })  : favorites = favorites ?? <String>{},
         readUnits = readUnits ?? <String>{},
         scrollOffsets = scrollOffsets ?? <String, double>{},
@@ -45,6 +73,9 @@ class ReadingProgress {
   /// The grade chosen on first launch (`g1`, `g2`, `g3`); null shows the picker.
   String? gradeId;
 
+  /// Typeface chosen in the settings page.
+  AppFont font;
+
   bool isFavorite(String id) => favorites.contains(id);
   bool isRead(String id) => readUnits.contains(id);
 
@@ -60,6 +91,7 @@ class ReadingProgress {
       themeMode: themeMode,
       textScale: textScale,
       gradeId: gradeId,
+      font: font,
     );
   }
 
@@ -73,6 +105,7 @@ class ReadingProgress {
       'themeMode': themeMode.name,
       'textScale': textScale,
       'gradeId': gradeId,
+      'font': font.name,
     };
   }
 
@@ -86,6 +119,7 @@ class ReadingProgress {
       themeMode: AppThemeMode.parse(json['themeMode'] as String?),
       textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
       gradeId: json['gradeId'] as String?,
+      font: AppFont.parse(json['font'] as String?),
     );
   }
 

@@ -132,8 +132,8 @@ class _SearchScreenState extends State<SearchScreen> {
                   EmptyState(
                     icon: Icons.search,
                     title: 'ابحث في كامل المحتوى',
-                    message: 'يشمل البحث عناوين الوحدات والموضوعات والمصطلحات واللوحات، '
-                        'ويعمل دون اتصال بالإنترنت.',
+                    message: 'يشمل البحث عناوين الوحدات والموضوعات والمصطلحات واللوحات '
+                        'والدروس التطبيقية، ويعمل دون اتصال بالإنترنت.',
                   )
                 else if (visible.isEmpty)
                   EmptyState(

@@ -14,22 +14,25 @@ void main() {
   });
 
   group('content integrity', () {
-    test('contains the twelve curriculum units and the introduction', () {
-      final gradeUnits = library.units.where((LearningUnit unit) => !unit.isIntroduction).toList();
+    test('contains the twelve curriculum units, the introduction and the theatre section', () {
+      final gradeUnits = library.units
+          .where((LearningUnit unit) => !unit.isIntroduction && !unit.isTheatre)
+          .toList();
       expect(gradeUnits.length, 12);
       expect(library.units.where((LearningUnit unit) => unit.isIntroduction).length, 1);
+      expect(library.units.where((LearningUnit unit) => unit.isTheatre).length, 1);
       expect(library.unitsOf('g1').length, 4);
       expect(library.unitsOf('g2').length, 4);
       expect(library.unitsOf('g3').length, 4);
     });
 
-    test('every unit has topics, a template and a source plate', () {
+    test('every unit has topics, a template and its artwork plate', () {
       for (final unit in library.units) {
         expect(unit.topics, isNotEmpty, reason: '${unit.id} has no topics');
         expect(unit.title.trim(), isNotEmpty);
         expect(unit.displayTitle.trim(), isNotEmpty);
-        if (!unit.isIntroduction) {
-          expect(unit.plate, isNotNull, reason: '${unit.id} has no teacher guide plate');
+        if (!unit.isIntroduction && !unit.isTheatre) {
+          expect(unit.plate, isNotNull, reason: '${unit.id} has no artwork plate');
         }
       }
     });
@@ -83,14 +86,43 @@ void main() {
       expect(total, greaterThanOrEqualTo(8));
     });
 
-    test('lesson plans keep theory and practice sessions', () {
+    test('practical lessons keep only the presentation and the home assignment', () {
       expect(library.lessons.length, 4);
       for (final lesson in library.lessons) {
-        expect(lesson.plans.length, 2);
-        expect(lesson.plans.any((plan) => plan.isTheory), isTrue);
-        for (final plan in lesson.plans) {
-          expect(plan.specificAims, isNotEmpty);
-          expect(plan.subject.trim(), isNotEmpty);
+        expect(lesson.plans.length, 1, reason: '${lesson.id} still has a second session');
+        final plan = lesson.plans.first;
+        expect(plan.subject.trim(), isNotEmpty);
+        expect(plan.body, isNotEmpty);
+        // The weekly-plan rows are gone from the model: a lesson can only carry
+        // the presentation and the home assignment.
+        for (final block in plan.body) {
+          expect(block.text.contains('الأهداف العامة'), isFalse);
+          expect(block.text.contains('الوسائل التعليمية'), isFalse);
+        }
+      }
+    });
+
+    test('the theatre theme is a section of its own, not a plate', () {
+      final theatre = library.units.firstWhere((LearningUnit unit) => unit.isTheatre);
+      expect(theatre.topics.length, greaterThanOrEqualTo(5));
+      expect(theatre.intro.trim(), isNotEmpty);
+      expect(theatre.plate, isNull);
+      expect(
+        library.plates.where((Plate plate) => plate.unitId == theatre.id),
+        isEmpty,
+      );
+      expect(library.sections.any((ContentSection s) => s.kind == 'theatre'), isTrue);
+      expect(library.sections.any((ContentSection s) => s.kind == 'plates' && s.title.contains('دليل')), isFalse);
+    });
+
+    test('no page credits, source lines or guide references remain', () {
+      for (final plate in library.plates) {
+        expect(plate.caption.contains('دليل'), isFalse, reason: plate.id);
+      }
+      for (final unit in library.units) {
+        final plate = unit.plate;
+        if (plate != null) {
+          expect(plate.caption.contains('دليل'), isFalse, reason: unit.id);
         }
       }
     });
@@ -101,6 +133,18 @@ void main() {
         expect(library.unitById(term.unitId), isNotNull, reason: term.term);
         expect(term.definition.trim(), isNotEmpty);
       }
+    });
+
+    test('every plate asset is a compact crop without a white page', () {
+      for (final plate in library.plates) {
+        final file = File(plate.asset);
+        expect(file.existsSync(), isTrue, reason: plate.asset);
+        // A full scanned page keeps a large white margin around the artwork and
+        // shows up as an almost empty card in the gallery.
+        expect(file.lengthSync(), lessThan(260 * 1024), reason: '${plate.asset} looks like a full page');
+        expect(File(plate.asset).lengthSync(), greaterThan(20 * 1024));
+      }
+      expect(library.plates.length, 12);
     });
 
     test('all referenced assets exist on disk', () {

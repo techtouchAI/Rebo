@@ -4,10 +4,12 @@ import 'app_colors.dart';
 
 /// Typography and component styling shared by the whole application.
 abstract final class AppTheme {
-  static const String bodyFont = 'Almarai';
+  static const String bodyFontDefault = 'Almarai';
   static const String displayFont = 'Amiri';
 
-  static TextTheme _textTheme(TextTheme base, Color ink, Color soft) {
+  /// Typeface of the body text; every bundled family has the same weights, so
+  /// switching it at runtime only changes the family name.
+  static TextTheme _textTheme(TextTheme base, Color ink, Color soft, String bodyFont) {
     return base.apply(fontFamily: bodyFont, bodyColor: ink, displayColor: ink).copyWith(
           displayLarge: base.displayLarge!.copyWith(
             fontFamily: displayFont,
@@ -81,7 +83,7 @@ abstract final class AppTheme {
         );
   }
 
-  static ThemeData light() {
+  static ThemeData light({String bodyFont = bodyFontDefault}) {
     const scheme = ColorScheme(
       brightness: Brightness.light,
       primary: AppColors.clay,
@@ -110,10 +112,10 @@ abstract final class AppTheme {
       onInverseSurface: AppColors.paper,
       inversePrimary: AppColors.claySoft,
     );
-    return _build(scheme, AppColors.paper);
+    return _build(scheme, AppColors.paper, bodyFont);
   }
 
-  static ThemeData dark() {
+  static ThemeData dark({String bodyFont = bodyFontDefault}) {
     const scheme = ColorScheme(
       brightness: Brightness.dark,
       primary: Color(0xFFE38A6E),
@@ -142,12 +144,12 @@ abstract final class AppTheme {
       onInverseSurface: AppColors.night,
       inversePrimary: AppColors.clay,
     );
-    return _build(scheme, AppColors.night);
+    return _build(scheme, AppColors.night, bodyFont);
   }
 
-  static ThemeData _build(ColorScheme scheme, Color scaffoldBackground) {
+  static ThemeData _build(ColorScheme scheme, Color scaffoldBackground, String bodyFont) {
     final base = ThemeData(brightness: scheme.brightness, useMaterial3: true, colorScheme: scheme);
-    final textTheme = _textTheme(base.textTheme, scheme.onSurface, scheme.onSurfaceVariant);
+    final textTheme = _textTheme(base.textTheme, scheme.onSurface, scheme.onSurfaceVariant, bodyFont);
     return base.copyWith(
       scaffoldBackgroundColor: scaffoldBackground,
       textTheme: textTheme,

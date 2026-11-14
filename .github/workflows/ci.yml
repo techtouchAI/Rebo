@@ -137,7 +137,10 @@ jobs:
             assets/content/glossary.json \
             assets/content/plates.json \
             assets/fonts/Almarai-Regular.ttf \
-            assets/fonts/Amiri-Regular.ttf \
+            assets/fonts/Cairo-Regular.ttf \
+            assets/fonts/Tajawal-Regular.ttf \
+            assets/fonts/IBMPlexSansArabic-Regular.ttf \
+            assets/fonts/NotoKufiArabic-Regular.ttf \
             assets/illustrations/studio.svg \
             assets/illustrations/perspective.svg \
             assets/images/plates/plate-08.jpg \

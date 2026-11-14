@@ -9,7 +9,7 @@ import '../navigation/app_routes.dart';
 import '../state/app_state.dart';
 import '../widgets/text_scale_controls.dart';
 
-/// Gallery of the scanned plates of the teacher guide.
+/// Gallery of the artwork plates of the units.
 class PlatesScreen extends StatelessWidget {
   const PlatesScreen({super.key});
 
@@ -20,7 +20,7 @@ class PlatesScreen extends StatelessWidget {
     final plates = state.visiblePlates;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('لوحات من دليل المعلم'),
+        title: const Text('اللوحات'),
         actions: const <Widget>[TextScaleControls()],
       ),
       body: ListView(
@@ -32,8 +32,8 @@ class PlatesScreen extends StatelessWidget {
               children: <Widget>[
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  'أعمال فنية مصوّرة من صفحات دليل معلم التربية الفنية للمرحلة المتوسطة، '
-                  'مرتبطة بوحداتها. اضغط أي لوحة لعرضها بحجم أكبر.',
+                  'أعمال فنية مصوّرة مرتبطة بوحدات الصف المختار. '
+                  'اضغط أي لوحة لعرضها بحجم أكبر.',
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -94,15 +94,21 @@ class _PlateTile extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              AspectRatio(
-                aspectRatio: 4 / 3,
-                child: Image.asset(
-                  plate.asset,
-                  fit: BoxFit.cover,
-                  errorBuilder: (BuildContext context, Object error, StackTrace? stack) => Container(
+              ClipRect(
+                child: SizedBox(
+                  height: 210,
+                  child: ColoredBox(
                     color: scheme.surfaceContainerHighest,
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.broken_image_outlined),
+                    child: Image.asset(
+                      plate.asset,
+                      fit: BoxFit.contain,
+                      errorBuilder: (
+                        BuildContext context,
+                        Object error,
+                        StackTrace? stack,
+                      ) =>
+                          const Center(child: Icon(Icons.broken_image_outlined)),
+                    ),
                   ),
                 ),
               ),

@@ -7,7 +7,7 @@ import '../navigation/app_routes.dart';
 import '../state/app_state.dart';
 import '../widgets/text_scale_controls.dart';
 
-/// Glossary of the technical terms with the definitions of the source.
+/// Glossary of the technical terms with their short definitions.
 class GlossaryScreen extends StatelessWidget {
   const GlossaryScreen({super.key});
 
@@ -31,7 +31,7 @@ class GlossaryScreen extends StatelessWidget {
               children: <Widget>[
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  'تعريفات مختصرة مأخوذة حرفياً من موضوعات الوحدات، مع رابط إلى الوحدة التي وردت فيها.',
+                  'تعريفات مختصرة للمصطلحات الفنية، مع رابط إلى الوحدة التي ورد فيها كل مصطلح.',
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: AppSpacing.lg),

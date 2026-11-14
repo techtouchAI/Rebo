@@ -7,6 +7,7 @@ import 'package:mirsam/presentation/screens/home_screen.dart';
 import 'package:mirsam/presentation/screens/settings_screen.dart';
 import 'package:mirsam/presentation/screens/glossary_screen.dart';
 import 'package:mirsam/presentation/screens/index_screen.dart';
+import 'package:mirsam/presentation/screens/lesson_screen.dart';
 import 'package:mirsam/presentation/screens/quiz_screen.dart';
 import 'package:mirsam/presentation/screens/search_screen.dart';
 import 'package:mirsam/presentation/screens/unit_screen.dart';
@@ -30,6 +31,52 @@ void main() {
 
     final directionality = tester.widget<Directionality>(find.byType(Directionality).first);
     expect(directionality.textDirection, TextDirection.rtl);
+  });
+
+  testWidgets('the unit reader offers a switcher for the four units', (WidgetTester tester) async {
+    await pumpScreen(tester, const UnitScreen(unitId: 'g1-u2'), size: const Size(900, 1200));
+
+    // The switcher shows every unit of the grade, numbered.
+    for (final String unit in <String>[
+      'التعبير الفني',
+      'التصميم والزخرفة',
+      'التشكيل الفني والهندسي',
+      'التذوق وتاريخ الفن',
+    ]) {
+      expect(find.textContaining(unit), findsWidgets, reason: unit);
+    }
+    await tester.tap(find.textContaining('التذوق وتاريخ الفن').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(UnitScreen), findsOneWidget);
+    expect(find.textContaining('الوحدة الرابعة: التذوق وتاريخ الفن'), findsWidgets);
+  });
+
+  testWidgets('the settings page switches the reading font', (WidgetTester tester) async {
+    final state = await pumpApplication(tester);
+    await tapDestination(tester, 'الإعدادات');
+
+    await tester.tap(find.text('القاهرة').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(state.font, AppFont.cairo);
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.theme!.textTheme.bodyLarge!.fontFamily, 'Cairo');
+  });
+
+  testWidgets('the practical lesson page shows only the presentation and the homework',
+      (WidgetTester tester) async {
+    await pumpScreen(tester, const LessonScreen(lessonId: 'lesson-light'), size: const Size(900, 2000));
+
+    expect(find.text('العرض'), findsOneWidget);
+    expect(find.textContaining('واجب'), findsWidgets);
+    expect(find.text('الأهداف العامة'), findsNothing);
+    expect(find.text('الأهداف الخاصة'), findsNothing);
+    expect(find.text('الوسائل التعليمية'), findsNothing);
+    expect(find.text('المقدمة'), findsNothing);
+    expect(find.text('الحصة العملية'), findsNothing);
   });
 
   testWidgets('the index lists the chosen grade and its units', (WidgetTester tester) async {

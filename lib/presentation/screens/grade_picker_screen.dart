@@ -58,7 +58,8 @@ class GradePickerScreen extends StatelessWidget {
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     'سيقتصر التطبيق على وحدات الصف الذي تختاره وموضوعاته وأسئلته ولوحاته '
-                    'ومصطلحاته. يمكنك تغيير الصف لاحقًا من صفحة الإعدادات.',
+                    'ومصطلحاته، مع المدخل العام والدروس التطبيقية ومفردات الأنشطة المسرحية. '
+                    'يمكنك تغيير الصف لاحقًا من صفحة الإعدادات.',
                     style: theme.textTheme.bodyLarge?.copyWith(height: 1.7),
                   ),
                   const SizedBox(height: AppSpacing.xl),

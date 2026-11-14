@@ -23,8 +23,8 @@ class MirsamApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: AppTheme.light(bodyFont: state.font.family),
+      darkTheme: AppTheme.dark(bodyFont: state.font.family),
       themeMode: state.themeMode,
       builder: (BuildContext context, Widget? child) {
         final media = MediaQuery.of(context);

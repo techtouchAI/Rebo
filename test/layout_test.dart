@@ -77,6 +77,10 @@ void main() {
     await expectFitsPhone(tester, const LessonScreen(lessonId: 'lesson-light'), 'lesson');
   });
 
+  testWidgets('the theatre section fits a phone', (WidgetTester tester) async {
+    await expectFitsPhone(tester, const UnitScreen(unitId: 'theatre'), 'theatre');
+  });
+
   testWidgets('unit reader fits a phone', (WidgetTester tester) async {
     await expectFitsPhone(tester, const UnitScreen(unitId: 'g1-u1'), 'unit');
   });

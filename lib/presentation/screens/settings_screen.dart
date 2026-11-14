@@ -107,6 +107,50 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
         _SettingsCard(
+          title: 'الخط',
+          icon: Icons.font_download_outlined,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Text(
+                'اختر خط القراءة (${toArabicDigits('${AppFont.values.length}')} خطوط عربية مضمّنة '
+                'في التطبيق؛ يعمل التغيير دون اتصال بالإنترنت).',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: <Widget>[
+                  for (final AppFont font in AppFont.values)
+                    ChoiceChip(
+                      label: Text(
+                        font.label,
+                        style: theme.textTheme.labelLarge?.copyWith(fontFamily: font.family),
+                      ),
+                      selected: state.font == font,
+                      onSelected: (_) => state.setFont(font),
+                    ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(AppRadii.sm),
+                  border: Border.all(color: scheme.outlineVariant),
+                ),
+                child: Text(
+                  'نموذج للنص بالخط المختار: الخط أساس في تكوين الأشكال، '
+                  'والوحدة والاتزان وتوزيع الضوء من قواعد تنظيم العمل الفني.',
+                  style: theme.textTheme.bodyLarge,
+                ),
+              ),
+            ],
+          ),
+        ),
+        _SettingsCard(
           title: 'التقدم المحلي',
           icon: Icons.insights_outlined,
           child: Column(
@@ -134,14 +178,14 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
         _SettingsCard(
-          title: 'عن المحتوى',
+          title: 'محتوى التطبيق',
           icon: Icons.menu_book_outlined,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                'جميع الموضوعات والأسئلة مأخوذة من ملف «ملخص التربية الفنية» للمرحلة المتوسطة، '
-                'ومن خطط الدروس ولوحات دليل المعلم. لم يُضف محتوى علمي من خارج المصدر.',
+                'موضوعات التربية الفنية للمرحلة المتوسطة وأسئلتها ومصطلحاتها ولوحاتها، '
+                'والدروس التطبيقية ومفردات الأنشطة المسرحية.',
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: AppSpacing.md),
@@ -173,9 +217,7 @@ class SettingsScreen extends StatelessWidget {
               const _InfoRow(label: 'الإصدار', value: '1.0.0 (1)'),
               _InfoRow(
                 label: 'الوحدات',
-                value: toArabicDigits(
-                  '${state.visibleUnits.where((unit) => !unit.isIntroduction).length}',
-                ),
+                value: toArabicDigits('${state.visibleUnits.length}'),
               ),
               _InfoRow(label: 'اللوحات', value: toArabicDigits('${state.visiblePlates.length}')),
               _InfoRow(label: 'الدروس التطبيقية', value: toArabicDigits('${state.library.lessons.length}')),
@@ -211,7 +253,7 @@ class SettingsScreen extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
         children: <Widget>[
-          const AppPageHeader(title: 'الإعدادات', subtitle: 'المظهر، التقدم، وعن المحتوى'),
+          const AppPageHeader(title: 'الإعدادات', subtitle: 'المظهر، الخط، التقدم، ومحتوى التطبيق'),
           AppPage(maxWidth: AppLayout.readingMaxWidth, child: body),
         ],
       ),
