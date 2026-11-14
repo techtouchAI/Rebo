@@ -87,7 +87,7 @@ class SettingsScreen extends StatelessWidget {
                 value: state.textScale,
                 min: AppState.MinTextScale,
                 max: AppState.MaxTextScale,
-                divisions: 6,
+                divisions: AppState.textScaleDivisions,
                 label: '${(state.textScale * 100).round()}٪',
                 onChanged: (double value) => state.setTextScale(value),
               ),

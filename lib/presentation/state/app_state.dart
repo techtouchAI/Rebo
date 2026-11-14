@@ -48,7 +48,9 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  double get textScale => _progress.textScale;
+  /// Always inside the supported range, even for a value saved by an older
+  /// version whose range was wider.
+  double get textScale => _progress.textScale.clamp(MinTextScale, MaxTextScale);
 
   bool isDark(BuildContext context) {
     final mode = _progress.themeMode;
@@ -68,13 +70,22 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> setTextScale(double scale) async {
-    _progress.textScale = scale.clamp(MinTextScale, MaxTextScale);
+    // Rounded to whole percents so repeated steps never drift (0.1 + 0.2…).
+    final rounded = (scale * 100).round() / 100;
+    _progress.textScale = rounded.clamp(MinTextScale, MaxTextScale);
     notifyListeners();
     await _persist();
   }
 
-  static const double MinTextScale = 0.9;
-  static const double MaxTextScale = 1.5;
+  static const double MinTextScale = 0.5;
+  static const double MaxTextScale = 1.2;
+
+  /// One zoom step, shared by the zoom buttons and the settings slider.
+  static const double TextScaleStep = 0.1;
+
+  /// Number of [TextScaleStep]s between the two bounds.
+  static int get textScaleDivisions =>
+      ((MaxTextScale - MinTextScale) / TextScaleStep).round();
 
   // ---------------------------------------------------------------- grade ---
 
