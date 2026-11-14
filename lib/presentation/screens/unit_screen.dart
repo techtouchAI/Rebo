@@ -5,8 +5,10 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/dimens.dart';
 import '../../core/utils/arabic_text.dart';
 import '../../core/widgets/app_page.dart';
+import '../../core/widgets/equal_columns_grid.dart';
 import '../../core/widgets/meta_pill.dart';
 import '../../core/widgets/section_header.dart';
+import '../../core/widgets/single_line_row.dart';
 import '../../domain/models/library.dart';
 import '../navigation/app_routes.dart';
 import '../state/app_state.dart';
@@ -25,6 +27,9 @@ class UnitScreen extends StatefulWidget {
 }
 
 class _UnitScreenState extends State<UnitScreen> {
+  /// The unit's terms are always laid out three per row.
+  static const int _termsPerRow = 3;
+
   ScrollController? _controller;
   AppState? _state;
   bool _initialised = false;
@@ -166,13 +171,11 @@ class _UnitScreenState extends State<UnitScreen> {
                       subtitle: 'تعريفات كما وردت في المصدر',
                       accent: colorsSecondary(context),
                     ),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
+                    EqualColumnsGrid(
+                      columns: _termsPerRow,
                       children: terms
-                          .map((GlossaryTerm term) => ActionChip(
-                                avatar: const Icon(Icons.translate, size: 16),
-                                label: Text(term.term),
+                          .map((GlossaryTerm term) => _TermChip(
+                                term: term,
                                 onPressed: () => _showTerm(term),
                               ))
                           .toList(growable: false),
@@ -267,11 +270,15 @@ class _UnitHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
+          // Two fixed lines: the grade, then the unit's meta information.
+          SingleLineRow(
             children: <Widget>[
               MetaPill(label: unit.isIntroduction ? 'مدخل' : unit.grade, color: accent, filled: true),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SingleLineRow(
+            children: <Widget>[
               MetaPill(label: unit.numberLabel, color: scheme.secondary),
               MetaPill(label: unit.template.label, icon: Icons.dashboard_customize_outlined, color: scheme.tertiary),
               MetaPill(
@@ -292,6 +299,56 @@ class _UnitHeader extends StatelessWidget {
             style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15.5, color: scheme.onSurfaceVariant),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// One glossary term of the unit, sized by its grid cell.
+///
+/// The label ignores the text scale and takes at most two lines, so the grid
+/// keeps its three columns and a stable height at every reading size; the full
+/// term and its definition open on tap.
+class _TermChip extends StatelessWidget {
+  const _TermChip({required this.term, required this.onPressed});
+
+  final GlossaryTerm term;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppRadii.sm),
+      side: BorderSide(color: scheme.outlineVariant),
+    );
+    return Semantics(
+      button: true,
+      child: Material(
+        color: scheme.surface,
+        shape: shape,
+        child: InkWell(
+          customBorder: shape,
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
+            child: Center(
+              child: MediaQuery.withNoTextScaling(
+                child: Text(
+                  term.term,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: scheme.onSurface,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
