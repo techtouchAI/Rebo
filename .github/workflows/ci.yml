@@ -86,6 +86,15 @@ jobs:
           status=$?
           python3 tools/ci_report.py analyze "$RUNNER_TEMP/analysis.txt"
           exit $status
+      - name: Flutter static analysis
+        run: |
+          set +e
+          flutter analyze --no-pub --no-fatal-infos 2>&1 | tee "$RUNNER_TEMP/flutter-analysis.txt"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            python3 tools/ci_report.py log "$RUNNER_TEMP/flutter-analysis.txt"
+          fi
+          exit $status
       - name: Tests
         run: |
           set +e
@@ -145,6 +154,9 @@ jobs:
           grep -q "sdkVersion:'24'" /tmp/badging.txt
           grep -q "targetSdkVersion:'36'" /tmp/badging.txt
           grep -q "application-label:" /tmp/badging.txt
+          # Read the archive listing once; a grep -q pipeline can SIGPIPE unzip.
+          APK_ENTRIES="$RUNNER_TEMP/apk-entries.txt"
+          unzip -Z1 "$APK" > "$APK_ENTRIES"
           for asset in \
             assets/content/curriculum.json \
             assets/content/lessons.json \
@@ -155,20 +167,24 @@ jobs:
             assets/fonts/Cairo-Regular.ttf \
             assets/fonts/Tajawal-Regular.ttf \
             assets/fonts/IBMPlexSansArabic-Regular.ttf \
+            assets/fonts/IBMPlexSansArabic-Bold.ttf \
             assets/fonts/NotoKufiArabic-Regular.ttf \
+            assets/fonts/NotoKufiArabic-Bold.ttf \
+            assets/fonts/Amiri-Regular.ttf \
+            assets/fonts/Amiri-Bold.ttf \
             assets/illustrations/studio.svg \
             assets/illustrations/perspective.svg \
             assets/images/plates/plate-01.jpg \
             assets/images/plates/plate-10.jpg \
             assets/images/drawings/drawing-01.png \
             assets/images/drawings/drawing-14.png ; do
-            if ! unzip -l "$APK" | grep -q "flutter_assets/$asset"; then
+            if ! grep -Fxq "assets/flutter_assets/$asset" "$APK_ENTRIES"; then
               echo "::error::the APK is missing $asset"
               exit 1
             fi
           done
-          unzip -l "$APK" | grep -q "lib/arm64-v8a/libapp.so"
-          unzip -l "$APK" | grep -q "lib/arm64-v8a/libflutter.so"
+          grep -Fxq "lib/arm64-v8a/libapp.so" "$APK_ENTRIES"
+          grep -Fxq "lib/arm64-v8a/libflutter.so" "$APK_ENTRIES"
           echo "::notice::APK verified: package, SDK levels, label and all bundled assets are present"
       - name: Copy the artifacts
         run: |
@@ -336,8 +352,16 @@ jobs:
           $required = @(
             'mirsam.exe',
             'flutter_windows.dll',
+            'printing_plugin.dll',
+            'pdfium.dll',
             'data\flutter_assets\assets\content\curriculum.json',
             'data\flutter_assets\assets\fonts\Almarai-Regular.ttf',
+            'data\flutter_assets\assets\fonts\IBMPlexSansArabic-Regular.ttf',
+            'data\flutter_assets\assets\fonts\IBMPlexSansArabic-Bold.ttf',
+            'data\flutter_assets\assets\fonts\NotoKufiArabic-Regular.ttf',
+            'data\flutter_assets\assets\fonts\NotoKufiArabic-Bold.ttf',
+            'data\flutter_assets\assets\fonts\Amiri-Regular.ttf',
+            'data\flutter_assets\assets\fonts\Amiri-Bold.ttf',
             'data\flutter_assets\assets\illustrations\studio.svg',
             'data\flutter_assets\assets\images\plates\plate-01.jpg',
             'data\flutter_assets\assets\content\drawings.json',

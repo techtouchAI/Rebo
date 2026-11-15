@@ -297,7 +297,16 @@ class _SectionsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sections = state.visibleSections;
+    // Printing is an application feature, not a curriculum section in JSON.
+    final sections = <ContentSection>[
+      const ContentSection(
+        id: 'question-printing',
+        title: 'طباعة أسئلة الامتحان',
+        subtitle: 'اختر الوحدات واطبع أسئلتها مع الإجابات',
+        kind: 'question-printing',
+      ),
+      ...state.visibleSections,
+    ];
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         final columns = constraints.maxWidth >= 980
@@ -335,12 +344,15 @@ class _SectionCard extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     final accent = switch (section.kind) {
       'intro' => AppColors.fromAccent('secondary', isDark),
+      'question-printing' => AppColors.fromAccent('secondary', isDark),
       'lessons' => AppColors.fromAccent('green', isDark),
       'drawings' => AppColors.fromAccent('ink', isDark),
       'plates' => AppColors.fromAccent('gold', isDark),
       _ => AppColors.fromAccent('primary', isDark),
     };
     final count = switch (section.kind) {
+      'question-printing' => state.visibleUnits.fold<int>(
+          0, (int sum, LearningUnit unit) => sum + unit.questions.length),
       'lessons' => state.library.lessons.length,
       'drawings' => state.visibleDrawings.length,
       'plates' => state.visiblePlates.length,
@@ -378,6 +390,7 @@ class _SectionCard extends StatelessWidget {
                   const Spacer(),
                   Text(
                     '${toArabicDigits('$count')} ${switch (section.kind) {
+                      'question-printing' => 'سؤالاً',
                       'lessons' => 'دروس',
                       'drawings' => 'رسوم',
                       'plates' => 'لوحة',
@@ -413,6 +426,9 @@ class _SectionCard extends StatelessWidget {
 
   void _openSection(BuildContext context, ContentSection section) {
     switch (section.kind) {
+      case 'question-printing':
+        AppRoutes.openQuestionPrinting(context);
+        break;
       case 'lessons':
         AppRoutes.openLessons(context);
         break;
@@ -438,6 +454,8 @@ class _SectionCard extends StatelessWidget {
 
   IconData _iconFor(String kind) {
     switch (kind) {
+      case 'question-printing':
+        return Icons.print_outlined;
       case 'intro':
         return Icons.auto_stories_outlined;
       case 'theatre':
