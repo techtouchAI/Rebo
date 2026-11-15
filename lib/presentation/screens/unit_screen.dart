@@ -177,13 +177,21 @@ class _UnitScreenState extends State<UnitScreen> {
                     accent: accent,
                   ),
                   UnitSections(unit: unit, accent: accent),
-                  if (unit.plate != null) ...<Widget>[
+                  if (unit.plates.isNotEmpty) ...<Widget>[
                     const SizedBox(height: AppSpacing.xl),
                     SectionHeader(
-                      title: 'لوحة الوحدة',
+                      title: unit.plates.length == 1 ? 'لوحة الوحدة' : 'لوحات الوحدة',
+                      subtitle: unit.plates.length > 1
+                          ? '${toArabicDigits('${unit.plates.length}')} صور توضيحية'
+                          : null,
                       accent: AppColors.ochre,
                     ),
-                    _PlateCard(unit: unit),
+                    ...unit.plates.map(
+                      (UnitPlate plate) => Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                        child: _PlateCard(plate: plate),
+                      ),
+                    ),
                   ],
                   if (terms.isNotEmpty) ...<Widget>[
                     const SizedBox(height: AppSpacing.xl),
@@ -393,15 +401,14 @@ class _TermChip extends StatelessWidget {
 }
 
 class _PlateCard extends StatelessWidget {
-  const _PlateCard({required this.unit});
+  const _PlateCard({required this.plate});
 
-  final LearningUnit unit;
+  final UnitPlate plate;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final plate = unit.plate!;
     return Material(
       color: scheme.surface,
       borderRadius: BorderRadius.circular(AppRadii.md),
@@ -409,7 +416,10 @@ class _PlateCard extends StatelessWidget {
       child: InkWell(
         onTap: () {
           final plates = AppScope.read(context).library.plates;
-          final match = plates.where((Plate item) => item.asset == plate.asset);
+          final match = plates.where(
+            (Plate item) =>
+                (plate.id != null && item.id == plate.id) || item.asset == plate.asset,
+          );
           if (match.isNotEmpty) {
             AppRoutes.openPlate(context, match.first);
           }

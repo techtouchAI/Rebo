@@ -3,9 +3,11 @@
 
 The check fails (non-zero exit code) when:
 
-* a line of a source table is missing from the generated JSON,
-* a question, answer or glossary definition cannot be traced back to the source,
-* identifiers are duplicated, or a plate image is missing.
+* any topic, bullet, question, answer, reason, or image from
+  ``ملزمة_التربية_الفنية_بنموذج_إجابة_موحد.docx`` is missing or altered,
+* a choice answer lacks explicit evidence in its unit text,
+* a glossary definition cannot be traced back to the source,
+* identifiers are duplicated, or a plate/illustration asset is missing.
 """
 
 from __future__ import annotations
@@ -14,15 +16,17 @@ import json
 import sys
 from pathlib import Path
 
-import docx
-
 sys.path.insert(0, str(Path(__file__).parent))
-from contentlib import canon, docx_text, parse_questions, parse_topics, polish  # noqa: E402
+from contentlib import (  # noqa: E402
+    canon,
+    parse_malzama_docx,
+    read_docx_plain_text,
+)
 from theatre_content import THEATRE_TOPICS  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTENT = ROOT / "assets" / "content"
-SUMMARY_DOC = ROOT / "محتوى مكتمل" / "ملخص_التربية_الفنية.docx"
+MALZAMA_DOC = ROOT / "ملزمة_التربية_الفنية_بنموذج_إجابة_موحد.docx"
 INTRO_DOC = ROOT / "محتوى مكتمل" / "مقدمة.docx"
 LESSON_DOCS = {
     "الظل والضوء": ["الظل والضوء.docx", "الظل والضوء العملي.docx"],
@@ -30,7 +34,6 @@ LESSON_DOCS = {
     "الزخرفة": ["الرخرفة.docx", "الزخرفة عملي.docx"],
     "تصميم غلاف كتاب": ["تصميم غلاف كتاب.docx", "تصميم غلاف كتاب عملي.docx"],
 }
-
 
 errors: list[str] = []
 checks = 0
@@ -52,21 +55,6 @@ def load(name: str) -> dict:
         return json.load(handle)
 
 
-def unit_source_cells() -> list[list[list[str]]]:
-    """The topic-table cell lines of every unit, grouped per unit."""
-    document = docx.Document(str(SUMMARY_DOC))
-    units: list[list[list[str]]] = []
-    current: list[list[str]] | None = None
-    for table in document.tables:
-        lines_per_cell = []
-        for row in table.rows:
-            for cell in row.cells:
-                lines = [polish(line) for line in cell.text.split("\n") if polish(line)]
-                lines_per_cell.append(lines)
-        units.append(lines_per_cell)
-    return units
-
-
 def main() -> int:
     curriculum = load("curriculum.json")
     lessons = load("lessons.json")
@@ -78,27 +66,63 @@ def main() -> int:
     intro = [unit for unit in units if unit["sectionId"] == "intro"]
     theatre = [unit for unit in units if unit["sectionId"] == "theatre"]
 
-    expect(len(grade_units) == 12, f"expected 12 grade units, found {len(grade_units)}")
+    expect(len(grade_units) == 9, f"expected 9 grade units, found {len(grade_units)}")
     expect(len(intro) == 1, "expected exactly one introduction unit")
     expect(len(theatre) == 1, "expected exactly one theatre section")
     expect(len({unit["id"] for unit in units}) == len(units), "duplicate unit ids")
 
-    tables = unit_source_cells()
-    expect(len(tables) == 12, f"expected 12 source tables, found {len(tables)}")
+    source_units, source_media = parse_malzama_docx(MALZAMA_DOC)
+    expect(len(source_units) == 9, f"expected 9 source units, found {len(source_units)}")
 
-    # 1. every line of every source cell must survive into the unit JSON
-    for unit, cells in zip(grade_units, tables):
-        unit_text = canon(json.dumps(unit, ensure_ascii=False))
-        for lines in cells:
-            for line in lines:
-                stripped = line.lstrip("•").strip()
-                if stripped.startswith("تعداد") or not stripped:
-                    continue
-                if stripped[:2].rstrip("-").isdigit() and "-" in stripped[:3]:
-                    stripped = stripped.split("-", 1)[1].strip()
-                expect(canon(stripped) in unit_text, f"[{unit['id']}] lost source line: {stripped[:60]}")
+    # 1. Every topic, bullet, question, answer, reason, and image of the
+    #    unified booklet must survive verbatim into the generated JSON/assets.
+    expected_plates = 0
+    for unit, src in zip(grade_units, source_units):
+        uid = unit["id"]
+        expect(uid == src["id"], f"unit id mismatch: {uid} != {src['id']}")
+        expect(canon(unit["title"]) == canon(src["title"]), f"[{uid}] title mismatch")
+        expect(len(unit["topics"]) == len(src["topics"]), f"[{uid}] topic count mismatch")
 
-    # 2. topics/questions integrity
+        for topic, src_topic in zip(unit["topics"], src["topics"]):
+            expect(canon(topic["title"]) == canon(src_topic["title"]), f"[{uid}/{topic['id']}] topic title mismatch")
+            expect(len(topic["bullets"]) == len(src_topic["bullets"]), f"[{uid}/{topic['id']}] bullet count mismatch")
+            for bullet, src_bullet in zip(topic["bullets"], src_topic["bullets"]):
+                expect(canon(bullet) == canon(src_bullet), f"[{uid}/{topic['id']}] bullet mismatch: {src_bullet[:50]}")
+
+        expect(len(unit["questions"]) == len(src["questions"]), f"[{uid}] question count mismatch")
+        for q, src_q in zip(unit["questions"], src["questions"]):
+            expect(q["kind"] == src_q["kind"], f"[{uid}/{q['id']}] kind mismatch")
+            expect(canon(q["prompt"]) == canon(src_q["prompt"]), f"[{uid}/{q['id']}] prompt mismatch")
+            if q["kind"] == "trueFalse":
+                expect(q["answer"] == src_q["answer"], f"[{uid}/{q['id']}] trueFalse answer mismatch")
+                if src_q.get("answerSupport"):
+                    expect(
+                        canon(q.get("answerSupport", "")) == canon(src_q["answerSupport"]),
+                        f"[{uid}/{q['id']}] trueFalse reason mismatch",
+                    )
+            elif q["kind"] == "choice":
+                expect(len(q["options"]) == len(src_q["options"]), f"[{uid}/{q['id']}] option count mismatch")
+                for opt, src_opt in zip(q["options"], src_q["options"]):
+                    expect(canon(opt) == canon(src_opt), f"[{uid}/{q['id']}] option mismatch")
+                expect(q.get("answerIndex") == src_q["answerIndex"], f"[{uid}/{q['id']}] choice answerIndex mismatch")
+            elif q["kind"] == "open":
+                expect(canon(q["answer"]) == canon(src_q["answer"]), f"[{uid}/{q['id']}] open answer mismatch")
+
+        src_images = src.get("images", [])
+        unit_plates = unit.get("plates", [])
+        expect(len(unit_plates) == len(src_images), f"[{uid}] plate count mismatch")
+        expected_plates += len(src_images)
+        for u_plate, src_img in zip(unit_plates, src_images):
+            expect(canon(u_plate["caption"]) == canon(src_img["caption"]), f"[{uid}] plate caption mismatch")
+            asset_file = ROOT / u_plate["asset"]
+            expect(asset_file.exists(), f"missing unit plate file: {u_plate['asset']}")
+            if asset_file.exists():
+                expect(
+                    asset_file.read_bytes() == source_media[src_img["media"]],
+                    f"[{uid}] plate bytes differ from DOCX media {src_img['media']}",
+                )
+
+    # 2. Topics and questions integrity across all units
     total_questions = 0
     for unit in units:
         expect(bool(unit["topics"]), f"[{unit['id']}] has no topics")
@@ -121,6 +145,7 @@ def main() -> int:
             if question["kind"] == "choice":
                 expect(len(question["options"]) >= 2, f"[{unit['id']}] choice with one option")
                 index = question.get("answerIndex")
+                expect(index is not None, f"[{unit['id']}/{question['id']}] choice without answerIndex")
                 if index is not None:
                     expect(0 <= index < len(question["options"]), f"[{unit['id']}] bad answer index")
                     support = canon(question.get("answerSupport") or "")
@@ -131,20 +156,10 @@ def main() -> int:
                     )
             if question["kind"] == "open":
                 expect(bool(question["answer"].strip()), f"[{unit['id']}] open question without answer")
-    expect(total_questions >= 60, f"unexpectedly few questions: {total_questions}")
+    expect(total_questions == 73, f"expected 73 questions, found {total_questions}")
 
-    # 3. every question of the source document must be represented
-    source_questions = collect_source_questions()
-    generated = {
-        canon(question["prompt"])
-        for unit in units
-        for question in unit["questions"]
-    }
-    for prompt in source_questions:
-        expect(canon(prompt) in generated, f"question dropped: {prompt[:70]}")
-
-    # 4. introduction
-    intro_text = docx_text(docx.Document(str(INTRO_DOC)))
+    # 3. Introduction
+    intro_text = read_docx_plain_text(INTRO_DOC)
     intro_unit = intro[0]
     for topic in intro_unit["topics"]:
         for bullet in topic["bullets"]:
@@ -155,13 +170,13 @@ def main() -> int:
         for method in topic.get("methods", []):
             expect(canon(method["title"])[:20] in canon(intro_text), f"[intro] method missing: {method['title'][:40]}")
 
-    # 5. lessons: one session per topic, presentation + home assignment only
+    # 4. Lessons: one session per topic, presentation + home assignment only
     expect(len(lessons["lessons"]) == 4, "expected 4 lesson plans")
     dropped_fields = {"generalAims", "specificAims", "media", "introduction"}
     for lesson in lessons["lessons"]:
         expect(len(lesson["plans"]) == 1, f"[{lesson['id']}] expected a single session")
         source = "\n".join(
-            docx_text(docx.Document(str(ROOT / "محتوى مكتمل" / name)))
+            read_docx_plain_text(ROOT / "محتوى مكتمل" / name)
             for name in LESSON_DOCS[lesson["title"]]
         )
         for plan in lesson["plans"]:
@@ -174,30 +189,35 @@ def main() -> int:
             for item in plan["homework"]:
                 expect(canon(item) in canon(source), f"[{lesson['id']}] invented homework: {item[:50]}")
 
-    # 6. glossary + plates
-    corpus = canon("\n".join([docx_text(docx.Document(str(SUMMARY_DOC))), intro_text]))
+    # 5. Glossary + plates
+    malzama_text = "\n".join(u["unitText"] for u in grade_units)
+    corpus = canon("\n".join([malzama_text, intro_text]))
+    unit_map = {unit["id"]: unit for unit in units}
     for term in glossary["terms"]:
         expect(canon(term["definition"]) in corpus, f"glossary definition not in source: {term['term']}")
-        expect(term["unitId"] in {unit["id"] for unit in units}, f"glossary unit missing: {term['term']}")
-    expect(len(glossary["terms"]) >= 15, "glossary too small")
+        expect(term["unitId"] in unit_map, f"glossary unit missing: {term['term']}")
+        if term["unitId"] in unit_map and term.get("topicId"):
+            expect(
+                term["topicId"] in {t["id"] for t in unit_map[term["unitId"]]["topics"]},
+                f"glossary topic missing: {term['term']} -> {term['unitId']}/{term['topicId']}",
+            )
+    expect(len(glossary["terms"]) >= 20, f"glossary too small: {len(glossary['terms'])}")
 
-    expect(len(plates["plates"]) == 12, f"expected 12 plates, found {len(plates['plates'])}")
+    expect(len(plates["plates"]) == expected_plates, f"expected {expected_plates} plates, found {len(plates['plates'])}")
     for plate in plates["plates"]:
         expect((ROOT / plate["asset"]).exists(), f"missing plate asset: {plate['asset']}")
-        expect("source" not in plate, f"plate must carry no source line: {plate['id']}")
+        expect("المصدر:" not in plate["caption"], f"plate must carry no source credit: {plate['id']}")
+        expect(plate["unitId"] in unit_map, f"plate unit missing: {plate['id']}")
+
     expect(
         all(section["kind"] != "plates" or "دليل" not in section["title"].lower() for section in curriculum["sections"]),
         "the plates section must not be named after the teacher guide",
     )
+
+    # 6. Theatre
     theatre_unit = theatre[0]
     expect(bool(theatre_unit["topics"]), "the theatre section has no topics")
-    expect(
-        len(theatre_unit["topics"]) >= 5,
-        f"the theatre section lost topics: {len(theatre_unit['topics'])}",
-    )
-    # The theatre themes live inside the scanned page of the guide (there is no
-    # text layer in the DOCX), so the fidelity check pins the transcription that
-    # ships in the builder and rejects any later drift.
+    expect(len(theatre_unit["topics"]) >= 5, f"the theatre section lost topics: {len(theatre_unit['topics'])}")
     expect(
         [topic["title"] for topic in theatre_unit["topics"]]
         == [topic["title"] for topic in THEATRE_TOPICS],
@@ -213,16 +233,12 @@ def main() -> int:
         "the theatre section must not be shipped as a plate",
     )
 
-    # 7. illustrations referenced by content must exist
+    # 7. Illustrations referenced by content must exist
     figures = [figure for unit in units for figure in unit.get("figures", [])]
     figures += [figure for lesson in lessons["lessons"] for figure in lesson.get("figures", [])]
     for figure in figures:
         expect((ROOT / figure["asset"]).exists(), f"missing illustration: {figure['asset']}")
-    expect(len({figure["asset"] for figure in figures}) >= 12, "not enough illustrations")
-
-    # 8. every unit that belongs to a grade carries its plate
-    for unit in grade_units:
-        expect(bool(unit.get("plate")), f"[{unit['id']}] unit without teacher-guide plate")
+    expect(len({figure["asset"] for figure in figures}) >= 10, "not enough illustrations")
 
     if errors:
         print(f"content verification FAILED ({len(errors)} problems / {checks} checks)")
@@ -230,49 +246,8 @@ def main() -> int:
             print(" -", error)
         return 1
     print(f"content verification passed ({checks} checks)")
-    print(f"units={len(units)} topics={sum(len(u['topics']) for u in units)} questions={total_questions}")
+    print(f"units={len(units)} topics={sum(len(u['topics']) for u in units)} questions={total_questions} plates={len(plates['plates'])}")
     return 0
-
-
-def _shared_words(text: str, corpus: str) -> int:
-    words = [canon(word) for word in text.split() if len(canon(word)) > 3]
-    return sum(1 for word in words if word in corpus)
-
-
-def collect_source_questions() -> list[str]:
-    """Prompts of the unit question banks, in source order."""
-    document = docx.Document(str(SUMMARY_DOC))
-    paragraphs = [polish(p.text) for p in document.paragraphs if p.text.strip()]
-    lines: list[str] = []
-    mode = None
-    for text in paragraphs:
-        if text in ("صح وخطأ", "الاختيارات", "التعداد"):
-            mode = text
-            continue
-        if mode is None:
-            continue
-        if text == "أسئلة الوحدة" or text.startswith("الوحدة") or text.startswith("الصف"):
-            mode = None
-            continue
-        if mode in ("صح وخطأ", "الاختيارات"):
-            head = text.split("|")[0]
-            if "الإجابة:" in head:
-                head = head.split("الإجابة:")[0]
-            head = head.strip()
-            if head[:1].isdigit() and "-" in head[:3]:
-                head = head.split("-", 1)[1].strip()
-            if mode == "صح وخطأ":
-                lines.append(head)
-            elif "؟" in head:
-                lines.append(polish(head.split("؟")[0] + "؟"))
-        else:
-            if text.startswith("الإجابة:"):
-                continue
-            stripped = text
-            if stripped[:1].isdigit() and "-" in stripped[:3]:
-                stripped = stripped.split("-", 1)[1].strip()
-            lines.append(stripped)
-    return lines
 
 
 if __name__ == "__main__":

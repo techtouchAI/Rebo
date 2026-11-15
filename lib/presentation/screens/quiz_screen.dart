@@ -230,7 +230,7 @@ class _QuestionCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          if (question.kind == QuestionKind.trueFalse)
+          if (question.kind == QuestionKind.trueFalse) ...<Widget>[
             Row(
               children: <Widget>[
                 _ChoiceButton(
@@ -248,6 +248,25 @@ class _QuestionCard extends StatelessWidget {
                 ),
               ],
             ),
+            if ((submitted || revealed) &&
+                question.answerSupport != null &&
+                question.answerSupport!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.sm),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: scheme.secondaryContainer.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(AppRadii.sm),
+                  ),
+                  child: Text(
+                    'السبب: ${question.answerSupport!}',
+                    style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
+                  ),
+                ),
+              ),
+          ],
           if (question.kind == QuestionKind.choice)
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -269,6 +288,24 @@ class _QuestionCard extends StatelessWidget {
                       'لا توجد إجابة محددة لهذا السؤال؛ يُترك للمناقشة داخل الصف.',
                       style: theme.textTheme.labelMedium,
                     ),
+                  )
+                else if ((submitted || revealed) &&
+                    question.answerSupport != null &&
+                    question.answerSupport!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.xs),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: scheme.secondaryContainer.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(AppRadii.sm),
+                      ),
+                      child: Text(
+                        'التوضيح: ${question.answerSupport!}',
+                        style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -284,7 +321,9 @@ class _QuestionCard extends StatelessWidget {
                 child: Text(
                   question.answerText.isEmpty
                       ? 'لا توجد إجابة مدونة لهذا السؤال.'
-                      : 'الإجابة: ${question.answerText}',
+                      : question.answerText.contains('\n')
+                          ? 'الإجابة:\n${question.answerText}'
+                          : 'الإجابة: ${question.answerText}',
                   style: theme.textTheme.bodyLarge,
                 ),
               )

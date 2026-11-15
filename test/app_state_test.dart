@@ -55,11 +55,11 @@ void main() {
 
   test('favorites toggle on and off', () async {
     final state = buildState(library: library, progress: ReadingProgress(gradeId: 'g2'));
-    await state.toggleFavorite('g2-u3');
-    expect(state.isFavorite('g2-u3'), isTrue);
-    expect(state.favoriteUnits.map((unit) => unit.id), contains('g2-u3'));
-    await state.toggleFavorite('g2-u3');
-    expect(state.isFavorite('g2-u3'), isFalse);
+    await state.toggleFavorite('g2-u4');
+    expect(state.isFavorite('g2-u4'), isTrue);
+    expect(state.favoriteUnits.map((unit) => unit.id), contains('g2-u4'));
+    await state.toggleFavorite('g2-u4');
+    expect(state.isFavorite('g2-u4'), isFalse);
   });
 
   test('the best quiz score is kept', () async {
@@ -105,7 +105,7 @@ void main() {
     expect(state.gradeTitle, 'الصف الثاني المتوسط');
     expect(state.visibleUnits.every((LearningUnit unit) => unit.sectionId == 'g2'), isTrue);
     expect(state.visibleUnitIds, isNot(contains('g1-u1')));
-    expect(state.totalUnits, 4);
+    expect(state.totalUnits, 3);
     expect(state.visiblePlates.any((Plate plate) => plate.unitId.startsWith('g1')), isFalse);
     expect(state.theatreUnit, isNotNull);
     expect(state.visibleGlossary.any((GlossaryTerm term) => term.unitId.startsWith('g1')), isFalse);
@@ -139,7 +139,7 @@ void main() {
   test('section progress counts only the units of that grade', () async {
     final state = buildState(library: library);
     await state.markRead('g1-u1');
-    expect(state.sectionProgress('g1'), closeTo(0.25, 0.0001));
+    expect(state.sectionProgress('g1'), closeTo(1 / 3, 0.0001));
     expect(state.sectionReadCount('g1'), 1);
     expect(state.sectionProgress('g2'), 0);
   });

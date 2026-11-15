@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/dimens.dart';
+import '../../../core/utils/arabic_text.dart';
 import '../../../domain/models/library.dart';
 import '../topic_card.dart';
 
@@ -590,11 +591,12 @@ class _YearEntry {
 
 List<_YearEntry> _yearEntries(List<Topic> topics) {
   final entries = <_YearEntry>[];
-  final pattern = RegExp(r'(\d{4})');
+  final pattern = RegExp(r'([0-9٠-٩]{4})');
   for (final topic in topics) {
     for (final bullet in topic.bullets) {
       for (final match in pattern.allMatches(bullet)) {
-        final year = int.tryParse(match.group(1) ?? '');
+        final raw = _toAsciiDigits(match.group(1) ?? '');
+        final year = int.tryParse(raw);
         if (year == null || year < 1800 || year > 2100) {
           continue;
         }
@@ -604,6 +606,16 @@ List<_YearEntry> _yearEntries(List<Topic> topics) {
   }
   entries.sort((a, b) => a.year.compareTo(b.year));
   return entries;
+}
+
+String _toAsciiDigits(String value) {
+  const eastern = '٠١٢٣٤٥٦٧٨٩';
+  final buffer = StringBuffer();
+  for (final char in value.split('')) {
+    final index = eastern.indexOf(char);
+    buffer.write(index >= 0 ? '$index' : char);
+  }
+  return buffer.toString();
 }
 
 class _YearStrip extends StatelessWidget {
@@ -676,7 +688,7 @@ class _YearStrip extends StatelessWidget {
                                   border: Border.all(color: scheme.surface, width: 3),
                                 ),
                                 child: Text(
-                                  '$year',
+                                  toArabicDigits('$year'),
                                   textDirection: TextDirection.ltr,
                                   style: theme.textTheme.labelMedium?.copyWith(
                                     color: Colors.white,

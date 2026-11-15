@@ -59,21 +59,28 @@ void main() {
     expect(session.answeredCount, 1);
   });
 
-  test('the undocumented choice question is never marked wrong', () {
-    var checked = false;
+  test('an undocumented choice question is never marked wrong', () {
+    const undocumented = Question(
+      id: 'q-ungraded',
+      kind: QuestionKind.choice,
+      prompt: 'سؤال للمناقشة',
+      options: <String>['أ', 'ب'],
+      answerIndex: null,
+    );
+    final session = QuizSession(<Question>[undocumented]);
+    session.answerChoice(undocumented, 0);
+    expect(session.gradable, isEmpty);
+    expect(session.score, isNull);
+    expect(session.isCorrect(undocumented), isFalse);
+  });
+
+  test('every choice question in the unified booklet is gradable with evidence', () {
     for (final unit in library.units) {
-      for (final question in unit.questions) {
-        if (question.kind == QuestionKind.choice && question.answerIndex == null) {
-          final session = QuizSession(<Question>[question]);
-          session.answerChoice(question, 0);
-          expect(session.gradable, isEmpty);
-          expect(session.score, isNull);
-          expect(session.isCorrect(question), isFalse);
-          checked = true;
-        }
+      for (final question in unit.questions.where((Question q) => q.kind == QuestionKind.choice)) {
+        expect(question.isGradable, isTrue, reason: '${unit.id}/${question.id}');
+        expect(question.answerSupport, isNotNull, reason: '${unit.id}/${question.id}');
       }
     }
-    expect(checked, isTrue, reason: 'the source contains one question without a documented answer');
   });
 
   test('reset clears every answer', () {

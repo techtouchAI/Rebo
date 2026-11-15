@@ -35,7 +35,7 @@ void main() {
     expect(directionality.textDirection, TextDirection.rtl);
   });
 
-  testWidgets('the unit reader switches between the four units of the grade',
+  testWidgets('the unit reader switches between the three units of the grade',
       (WidgetTester tester) async {
     await pumpScreen(
       tester,
@@ -51,7 +51,6 @@ void main() {
     final labels = <String>[
       '${toArabicDigits('1')}. التعبير الفني',
       '${toArabicDigits('2')}. التصميم والزخرفة',
-      '${toArabicDigits('3')}. التشكيل الفني والهندسي',
       '${toArabicDigits('4')}. التذوق الفني وتاريخ الفن',
     ];
 
@@ -77,7 +76,20 @@ void main() {
     expect(header.unitId, 'g1-u4');
     final newBar = tester.widget<UnitSwitcherBar>(find.byType(UnitSwitcherBar));
     expect(newBar.current.id, 'g1-u4');
-    expect(newBar.units.length, 4);
+    expect(newBar.units.length, 3);
+  });
+
+  testWidgets('unit with multiple images renders all plates from the booklet',
+      (WidgetTester tester) async {
+    await pumpScreen(
+      tester,
+      const UnitScreen(unitId: 'g1-u2'),
+      size: const Size(900, 4000),
+    );
+
+    expect(find.text('لوحات الوحدة'), findsOneWidget);
+    expect(find.text('نماذج زخرفية من الدليل'), findsOneWidget);
+    expect(find.text('أمثلة للوحدات الزخرفية'), findsOneWidget);
   });
 
   testWidgets('the settings page switches the reading font', (WidgetTester tester) async {
@@ -116,7 +128,8 @@ void main() {
     // Nothing from the other two grades may leak into the index.
     expect(find.textContaining('الصف الثاني المتوسط'), findsNothing);
     expect(find.textContaining('الصف الثالث المتوسط'), findsNothing);
-    expect(find.textContaining('الوحدة الثالثة: التشكيل المجسم'), findsNothing);
+    expect(find.textContaining('الضوء والظل والتظليل'), findsNothing);
+    expect(find.textContaining('تطور الحركة الفنية في العراق'), findsNothing);
   });
 
   testWidgets('first launch asks for the grade and nothing else is shown',
@@ -144,7 +157,7 @@ void main() {
 
     await tapDestination(tester, 'الفهرس');
     expect(find.textContaining('الوحدة الأولى: التعبير الفني والهندسي'), findsWidgets);
-    expect(find.textContaining('الوحدة الثالثة: التشكيل المجسم'), findsWidgets);
+    expect(find.textContaining('الوحدة الرابعة: التذوق الفني وتاريخ الفن'), findsWidgets);
   });
 
   testWidgets('the grade can be changed again from the settings page',
@@ -234,9 +247,9 @@ void main() {
     expect(find.textContaining('تعريفات مختصرة'), findsOneWidget);
   });
 
-  testWidgets('the quiz screen accepts an answer and reports progress',
+  testWidgets('the quiz screen accepts an answer and reports progress and reason',
       (WidgetTester tester) async {
-    await pumpScreen(tester, const QuizScreen(unitId: 'g1-u1'), size: const Size(900, 2400));
+    await pumpScreen(tester, const QuizScreen(unitId: 'g1-u1'), size: const Size(900, 3200));
 
     expect(find.byType(QuizScreen), findsOneWidget);
     final scrollable = find.byType(Scrollable).first;
@@ -248,6 +261,21 @@ void main() {
     await tester.pump();
 
     expect(find.textContaining('أجبت عن'), findsWidgets);
+    await tester.scrollUntilVisible(find.textContaining('السبب:').first, -250, scrollable: scrollable);
+    expect(find.textContaining('السبب:'), findsWidgets);
+  });
+
+  testWidgets('timeline units extract Arabic-Indic years for the strip',
+      (WidgetTester tester) async {
+    await pumpScreen(
+      tester,
+      const UnitScreen(unitId: 'g3-u4'),
+      size: const Size(900, 1400),
+    );
+
+    expect(find.text('محطات زمنية'), findsOneWidget);
+    expect(find.text('١٩٣٩'), findsWidgets);
+    expect(find.text('١٩٥٦'), findsWidgets);
   });
 
   testWidgets('the favorites tab starts with an empty state', (WidgetTester tester) async {

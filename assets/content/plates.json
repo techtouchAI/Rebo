@@ -2,98 +2,82 @@
   "schemaVersion": 1,
   "plates": [
     {
-      "id": "plate-08",
-      "asset": "assets/images/plates/plate-08.jpg",
-      "title": "الوحدة الأولى: التعبير الفني",
-      "caption": "الصف الأول المتوسط - الوحدة الأولى: التعبير الفني",
+      "id": "plate-01",
+      "asset": "assets/images/plates/plate-01.jpg",
+      "title": "مخطط الألوان من الدليل",
+      "caption": "الوحدة الأولى: التعبير الفني — مخطط الألوان من الدليل",
       "grade": "الصف الأول المتوسط",
       "unitId": "g1-u1"
     },
     {
-      "id": "plate-09",
-      "asset": "assets/images/plates/plate-09.jpg",
-      "title": "الوحدة الثانية: التصميم والزخرفة",
-      "caption": "الصف الأول المتوسط - الوحدة الثانية: التصميم والزخرفة",
+      "id": "plate-02",
+      "asset": "assets/images/plates/plate-02.jpg",
+      "title": "نماذج زخرفية من الدليل",
+      "caption": "الوحدة الثانية: التصميم والزخرفة — نماذج زخرفية من الدليل",
       "grade": "الصف الأول المتوسط",
       "unitId": "g1-u2"
     },
     {
-      "id": "plate-10",
-      "asset": "assets/images/plates/plate-10.jpg",
-      "title": "الوحدة الثالثة: التشكيل الفني والهندسي",
-      "caption": "الصف الأول المتوسط - الوحدة الثالثة: التشكيل الفني والهندسي",
+      "id": "plate-03",
+      "asset": "assets/images/plates/plate-03.jpg",
+      "title": "أمثلة للوحدات الزخرفية",
+      "caption": "الوحدة الثانية: التصميم والزخرفة — أمثلة للوحدات الزخرفية",
       "grade": "الصف الأول المتوسط",
-      "unitId": "g1-u3"
+      "unitId": "g1-u2"
     },
     {
-      "id": "plate-11",
-      "asset": "assets/images/plates/plate-11.jpg",
-      "title": "الوحدة الرابعة: التذوق وتاريخ الفن",
-      "caption": "الصف الأول المتوسط - الوحدة الرابعة: التذوق وتاريخ الفن",
+      "id": "plate-04",
+      "asset": "assets/images/plates/plate-04.jpg",
+      "title": "شواهد من الفنون والآثار القديمة",
+      "caption": "الوحدة الرابعة: التذوق الفني وتاريخ الفن — شواهد من الفنون والآثار القديمة",
       "grade": "الصف الأول المتوسط",
       "unitId": "g1-u4"
     },
     {
-      "id": "plate-12",
-      "asset": "assets/images/plates/plate-12.jpg",
-      "title": "الوحدة الأولى: التعبير الفني والهندسي",
-      "caption": "الصف الثاني المتوسط - الوحدة الأولى: التعبير الفني والهندسي",
-      "grade": "الصف الثاني المتوسط",
-      "unitId": "g2-u1"
+      "id": "plate-05",
+      "asset": "assets/images/plates/plate-05.jpg",
+      "title": "نماذج أثرية",
+      "caption": "الوحدة الرابعة: التذوق الفني وتاريخ الفن — نماذج أثرية",
+      "grade": "الصف الأول المتوسط",
+      "unitId": "g1-u4"
     },
     {
-      "id": "plate-13",
-      "asset": "assets/images/plates/plate-13.jpg",
-      "title": "الوحدة الثانية: التصميم والزخرفة",
-      "caption": "الصف الثاني المتوسط - الوحدة الثانية: التصميم والزخرفة",
-      "grade": "الصف الثاني المتوسط",
-      "unitId": "g2-u2"
-    },
-    {
-      "id": "plate-14",
-      "asset": "assets/images/plates/plate-14.jpg",
-      "title": "الوحدة الثالثة: التشكيل المجسم",
-      "caption": "الصف الثاني المتوسط - الوحدة الثالثة: التشكيل المجسم",
-      "grade": "الصف الثاني المتوسط",
-      "unitId": "g2-u3"
-    },
-    {
-      "id": "plate-15",
-      "asset": "assets/images/plates/plate-15.jpg",
-      "title": "الوحدة الرابعة: التذوق الفني وتاريخ الفن",
-      "caption": "الصف الثاني المتوسط - الوحدة الرابعة: التذوق الفني وتاريخ الفن",
+      "id": "plate-06",
+      "asset": "assets/images/plates/plate-06.jpg",
+      "title": "نماذج من الفن العربي والإسلامي",
+      "caption": "الوحدة الرابعة: التذوق الفني وتاريخ الفن — نماذج من الفن العربي والإسلامي",
       "grade": "الصف الثاني المتوسط",
       "unitId": "g2-u4"
     },
     {
-      "id": "plate-16",
-      "asset": "assets/images/plates/plate-16.jpg",
-      "title": "الوحدة الأولى: التعبير الفني والهندسي",
-      "caption": "الصف الثالث المتوسط - الوحدة الأولى: التعبير الفني والهندسي",
-      "grade": "الصف الثالث المتوسط",
-      "unitId": "g3-u1"
+      "id": "plate-07",
+      "asset": "assets/images/plates/plate-07.jpg",
+      "title": "تفاصيل زخرفية",
+      "caption": "الوحدة الرابعة: التذوق الفني وتاريخ الفن — تفاصيل زخرفية",
+      "grade": "الصف الثاني المتوسط",
+      "unitId": "g2-u4"
     },
     {
-      "id": "plate-17",
-      "asset": "assets/images/plates/plate-17.jpg",
-      "title": "الوحدة الثانية: التصميم والزخرفة",
-      "caption": "الصف الثالث المتوسط - الوحدة الثانية: التصميم والزخرفة",
+      "id": "plate-08",
+      "asset": "assets/images/plates/plate-08.jpg",
+      "title": "مثال توضيحي من الدليل",
+      "caption": "الوحدة الثانية: التصميم والزخرفة — مثال توضيحي من الدليل",
       "grade": "الصف الثالث المتوسط",
       "unitId": "g3-u2"
     },
     {
-      "id": "plate-18",
-      "asset": "assets/images/plates/plate-18.jpg",
-      "title": "الوحدة الثالثة: التشكيل المجسم",
-      "caption": "الصف الثالث المتوسط - الوحدة الثالثة: التشكيل المجسم",
+      "id": "plate-09",
+      "asset": "assets/images/plates/plate-09.jpg",
+      "title": "نماذج من الحركة الفنية العراقية",
+      "caption": "الوحدة الرابعة: التذوق الفني وتاريخ الفن — نماذج من الحركة الفنية العراقية",
       "grade": "الصف الثالث المتوسط",
-      "unitId": "g3-u3"
+      "unitId": "g3-u4"
     },
     {
-      "id": "plate-19",
-      "asset": "assets/images/plates/plate-19.jpg",
-      "title": "الوحدة الرابعة: التذوق وتاريخ الفن",
-      "caption": "الصف الثالث المتوسط - الوحدة الرابعة: التذوق وتاريخ الفن",
+      "id": "plate-10",
+      "asset": "assets/images/plates/plate-10.jpg",
+      "title": "أعمال فنية عراقية",
+      "caption": "الوحدة الرابعة: التذوق الفني وتاريخ الفن — أعمال فنية عراقية",
       "grade": "الصف الثالث المتوسط",
       "unitId": "g3-u4"
     }

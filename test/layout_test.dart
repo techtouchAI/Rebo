@@ -66,7 +66,7 @@ void main() {
   });
 
   testWidgets('plate viewer fits a phone', (WidgetTester tester) async {
-    await expectFitsPhone(tester, const PlateViewerScreen(plateId: 'plate-08'), 'plate viewer');
+    await expectFitsPhone(tester, const PlateViewerScreen(plateId: 'plate-01'), 'plate viewer');
   });
 
   testWidgets('lessons index fits a phone', (WidgetTester tester) async {
