@@ -7,6 +7,7 @@ import 'package:mirsam/data/local/memory_exam_profile_repository.dart';
 import 'package:mirsam/domain/models/exam_paper.dart';
 import 'package:mirsam/domain/models/library.dart';
 import 'package:mirsam/domain/repositories/exam_profile_repository.dart';
+import 'package:mirsam/domain/services/exam_paper_formatter.dart';
 import 'package:mirsam/presentation/screens/exam_composer_screen.dart';
 import 'package:mirsam/presentation/state/app_state.dart';
 
@@ -218,9 +219,9 @@ void main() {
     expect(xml, contains('متوسطة النخبة للبنين'));
     expect(xml, contains('فائز محمد عبد النبي'));
     expect(xml, contains('اسئلة امتحانات نهاية السنة'));
-    expect(xml, contains(questions.trueFalse.prompt.substring(0, 20)));
-    expect(xml, contains(questions.choice.options.first.trim()));
-    expect(xml, contains(questions.open.prompt.substring(0, 20)));
+    expect(xml, contains(questions.trueFalse.question.prompt.substring(0, 20)));
+    expect(xml, contains(questions.choice.question.options.first.trim()));
+    expect(xml, contains(questions.open.question.prompt.substring(0, 20)));
     expect(xml, contains(drawing.title));
     expect(xml, contains('ارسم منظراً طبيعياً مستخدماً الألوان ؟'));
     expect(xml, contains('<w:sz w:val="40"/><w:szCs w:val="40"/>'));
