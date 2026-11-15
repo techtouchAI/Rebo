@@ -10,6 +10,7 @@ import 'package:mirsam/domain/repositories/exam_profile_repository.dart';
 import 'package:mirsam/domain/services/exam_paper_formatter.dart';
 import 'package:mirsam/presentation/screens/exam_composer_screen.dart';
 import 'package:mirsam/presentation/state/app_state.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'docx_test_support.dart';
 import 'overflow_utils.dart';
@@ -89,6 +90,13 @@ String fieldText(WidgetTester tester, String keyValue) =>
 
 void main() {
   setUpAll(ensureLibrary);
+
+  setUp(() {
+    // The home page opens the real composer, whose default profile store reads
+    // shared preferences; without the in-memory backend the plugin channel is
+    // missing in widget tests and the screen would stay on its spinner.
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+  });
 
   testWidgets('the home page opens the question writer', (tester) async {
     await pumpApplication(tester, size: const Size(1280, 1600));

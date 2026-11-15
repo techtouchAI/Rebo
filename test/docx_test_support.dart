@@ -84,7 +84,7 @@ void expectWellFormedXml(String xml) {
     if (close != null) {
       expect(stack.isNotEmpty && stack.last == close, isTrue, reason: 'unbalanced </$close>');
       stack.removeLast();
-    } else if (open != null && match.group(3) != '/') {
+    } else if (open != null && match.group(4) != '/') {
       stack.add(open);
     }
   }

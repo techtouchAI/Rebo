@@ -390,12 +390,12 @@ class _DocumentWriter {
       if (question.isEmpty) {
         continue;
       }
-      questionIndex++;
       _buffer.write(
         _paragraphXml(<_Run>[
           _Run(examTheoryHeading(question, questionIndex), size: bodySize, bold: true),
         ], keepNext: true),
       );
+      questionIndex++;
       var itemIndex = 0;
       for (final ExamTheoryItem item in question.items) {
         itemIndex++;

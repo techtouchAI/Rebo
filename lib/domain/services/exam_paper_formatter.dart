@@ -126,8 +126,8 @@ String examPaperAsPlainText(ExamPaper paper) {
     if (question.isEmpty) {
       continue;
     }
-    theoryIndex++;
     buffer.writeln(examTheoryHeading(question, theoryIndex));
+    theoryIndex++;
     var itemIndex = 0;
     for (final ExamTheoryItem item in question.items) {
       itemIndex++;
