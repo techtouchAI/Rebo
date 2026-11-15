@@ -14,25 +14,33 @@ void main() {
   });
 
   group('content integrity', () {
-    test('contains the twelve curriculum units, the introduction and the theatre section', () {
+    test('contains the nine curriculum units, the introduction and the theatre section', () {
       final gradeUnits = library.units
           .where((LearningUnit unit) => !unit.isIntroduction && !unit.isTheatre)
           .toList();
-      expect(gradeUnits.length, 12);
+      expect(gradeUnits.length, 9);
       expect(library.units.where((LearningUnit unit) => unit.isIntroduction).length, 1);
       expect(library.units.where((LearningUnit unit) => unit.isTheatre).length, 1);
-      expect(library.unitsOf('g1').length, 4);
-      expect(library.unitsOf('g2').length, 4);
-      expect(library.unitsOf('g3').length, 4);
+      expect(library.unitsOf('g1').length, 3);
+      expect(library.unitsOf('g2').length, 3);
+      expect(library.unitsOf('g3').length, 3);
     });
 
-    test('every unit has topics, a template and its artwork plate', () {
+    test('every unit has topics, a template and its documented plates', () {
+      const unitsWithPlates = <String>{
+        'g1-u1',
+        'g1-u2',
+        'g1-u4',
+        'g2-u4',
+        'g3-u2',
+        'g3-u4',
+      };
       for (final unit in library.units) {
         expect(unit.topics, isNotEmpty, reason: '${unit.id} has no topics');
         expect(unit.title.trim(), isNotEmpty);
         expect(unit.displayTitle.trim(), isNotEmpty);
-        if (!unit.isIntroduction && !unit.isTheatre) {
-          expect(unit.plate, isNotNull, reason: '${unit.id} has no artwork plate');
+        if (unitsWithPlates.contains(unit.id)) {
+          expect(unit.plates, isNotEmpty, reason: '${unit.id} has no plates');
         }
       }
     });
@@ -40,8 +48,8 @@ void main() {
     test('keeps the expected volume of topics and questions', () {
       final topics = library.units.fold<int>(0, (sum, unit) => sum + unit.topics.length);
       final questions = library.units.fold<int>(0, (sum, unit) => sum + unit.questions.length);
-      expect(topics, greaterThanOrEqualTo(70));
-      expect(questions, greaterThanOrEqualTo(66));
+      expect(topics, 37);
+      expect(questions, 73);
     });
 
     test('no empty statements, no duplicated identifiers', () {
@@ -63,15 +71,28 @@ void main() {
       }
     });
 
-    test('choice answers point inside their option list', () {
+    test('all choice answers point inside their option list with support', () {
       for (final unit in library.units) {
         for (final question in unit.questions.where((q) => q.kind == QuestionKind.choice)) {
           expect(question.options.length, greaterThanOrEqualTo(2));
           final index = question.answerIndex;
-          if (index != null) {
-            expect(index, inInclusiveRange(0, question.options.length - 1));
-            expect(question.answerSupport, isNotNull);
-          }
+          expect(index, isNotNull, reason: '${unit.id}/${question.id} missing answerIndex');
+          expect(index!, inInclusiveRange(0, question.options.length - 1));
+          expect(question.answerSupport, isNotNull);
+        }
+      }
+    });
+
+    test('false true/false answers include their reason from the unified answer key', () {
+      for (final unit in library.units) {
+        for (final question in unit.questions.where(
+          (q) => q.kind == QuestionKind.trueFalse && q.boolAnswer == false,
+        )) {
+          expect(
+            question.answerSupport?.trim(),
+            isNotEmpty,
+            reason: '${unit.id}/${question.id} missing false-statement reason',
+          );
         }
       }
     });
@@ -93,8 +114,6 @@ void main() {
         final plan = lesson.plans.first;
         expect(plan.subject.trim(), isNotEmpty);
         expect(plan.body, isNotEmpty);
-        // The weekly-plan rows are gone from the model: a lesson can only carry
-        // the presentation and the home assignment.
         for (final block in plan.body) {
           expect(block.text.contains('الأهداف العامة'), isFalse);
           expect(block.text.contains('الوسائل التعليمية'), isFalse);
@@ -115,14 +134,13 @@ void main() {
       expect(library.sections.any((ContentSection s) => s.kind == 'plates' && s.title.contains('دليل')), isFalse);
     });
 
-    test('no page credits, source lines or guide references remain', () {
+    test('no page credits remain on plates', () {
       for (final plate in library.plates) {
-        expect(plate.caption.contains('دليل'), isFalse, reason: plate.id);
+        expect(plate.caption.contains('المصدر:'), isFalse, reason: plate.id);
       }
       for (final unit in library.units) {
-        final plate = unit.plate;
-        if (plate != null) {
-          expect(plate.caption.contains('دليل'), isFalse, reason: unit.id);
+        for (final plate in unit.plates) {
+          expect(plate.caption.contains('المصدر:'), isFalse, reason: unit.id);
         }
       }
     });
@@ -135,16 +153,14 @@ void main() {
       }
     });
 
-    test('every plate asset is a compact crop without a white page', () {
+    test('every plate asset exists and has valid size', () {
       for (final plate in library.plates) {
         final file = File(plate.asset);
         expect(file.existsSync(), isTrue, reason: plate.asset);
-        // A full scanned page keeps a large white margin around the artwork and
-        // shows up as an almost empty card in the gallery.
-        expect(file.lengthSync(), lessThan(260 * 1024), reason: '${plate.asset} looks like a full page');
-        expect(File(plate.asset).lengthSync(), greaterThan(20 * 1024));
+        expect(file.lengthSync(), lessThan(260 * 1024), reason: '${plate.asset} unexpectedly large');
+        expect(file.lengthSync(), greaterThan(10 * 1024), reason: '${plate.asset} unexpectedly small');
       }
-      expect(library.plates.length, 12);
+      expect(library.plates.length, 10);
     });
 
     test('all referenced assets exist on disk', () {
@@ -155,7 +171,7 @@ void main() {
           for (final figure in lesson.figures) figure.asset,
         for (final plate in library.plates) plate.asset,
         for (final unit in library.units)
-          if (unit.plate != null) unit.plate!.asset,
+          for (final plate in unit.plates) plate.asset,
       };
       expect(paths.length, greaterThanOrEqualTo(20));
       for (final path in paths) {

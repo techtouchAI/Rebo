@@ -242,15 +242,17 @@ class Question {
   }
 }
 
-/// The scanned artwork plate that belongs to a unit.
+/// An artwork plate or diagram image that belongs to a unit.
 class UnitPlate {
-  const UnitPlate({required this.asset, required this.caption});
+  const UnitPlate({this.id, required this.asset, required this.caption});
 
+  final String? id;
   final String asset;
   final String caption;
 
   factory UnitPlate.fromJson(Map<String, dynamic> json) {
     return UnitPlate(
+      id: json['id'] as String?,
       asset: json['asset'] as String? ?? '',
       caption: json['caption'] as String? ?? '',
     );
@@ -271,7 +273,7 @@ class LearningUnit {
     required this.topics,
     required this.questions,
     required this.figures,
-    this.plate,
+    this.plates = const <UnitPlate>[],
     this.glossaryIds = const <String>[],
     this.unitText = '',
     this.intro = '',
@@ -288,9 +290,12 @@ class LearningUnit {
   final List<Topic> topics;
   final List<Question> questions;
   final List<Figure> figures;
-  final UnitPlate? plate;
+  final List<UnitPlate> plates;
   final List<String> glossaryIds;
   final String unitText;
+
+  /// First plate attached to the unit, if any.
+  UnitPlate? get plate => plates.isEmpty ? null : plates.first;
 
   /// Short presentation paragraph of a section that is not a curriculum unit
   /// (the theatre themes section).
@@ -323,7 +328,15 @@ class LearningUnit {
     final figures = (json['figures'] as List<dynamic>? ?? const <dynamic>[])
         .map((item) => Figure.fromJson(item as Map<String, dynamic>))
         .toList(growable: false);
+    final platesJson = json['plates'] as List<dynamic>?;
     final plateJson = json['plate'] as Map<String, dynamic>?;
+    final plates = platesJson != null
+        ? platesJson
+            .map((item) => UnitPlate.fromJson(item as Map<String, dynamic>))
+            .toList(growable: false)
+        : (plateJson == null
+            ? const <UnitPlate>[]
+            : <UnitPlate>[UnitPlate.fromJson(plateJson)]);
     return LearningUnit(
       id: json['id'] as String? ?? '',
       sectionId: json['sectionId'] as String? ?? '',
@@ -336,7 +349,7 @@ class LearningUnit {
       topics: topics,
       questions: questions,
       figures: figures,
-      plate: plateJson == null ? null : UnitPlate.fromJson(plateJson),
+      plates: plates,
       glossaryIds: _stringList(json['glossary']),
       unitText: json['unitText'] as String? ?? '',
       intro: json['intro'] as String? ?? '',

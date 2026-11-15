@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/dimens.dart';
+import '../../core/utils/arabic_text.dart';
 import '../../core/widgets/app_page.dart';
 import '../../core/widgets/meta_pill.dart';
 import '../../core/widgets/section_header.dart';
@@ -39,7 +40,7 @@ class PlatesScreen extends StatelessWidget {
                 const SizedBox(height: AppSpacing.lg),
                 SectionHeader(
                   title: 'اللوحات',
-                  subtitle: '${plates.length} لوحة',
+                  subtitle: '${toArabicDigits('${plates.length}')} لوحة',
                 ),
                 LayoutBuilder(
                   builder: (BuildContext context, BoxConstraints constraints) {
