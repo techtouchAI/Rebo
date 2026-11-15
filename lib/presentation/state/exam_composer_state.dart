@@ -248,7 +248,7 @@ class ExamComposerState extends ChangeNotifier {
     return <ExamTheoryItem>[
       for (final ExamQuestionOption option in options)
         if (option.question.kind == kind && selection.contains(option.id))
-          ExamTheoryItem.fromQuestion(option.question),
+          ExamTheoryItem.fromQuestion(option.question, id: option.id),
     ];
   }
 

@@ -206,9 +206,13 @@ class ExamTheoryItem {
   final String prompt;
   final List<String> options;
 
-  factory ExamTheoryItem.fromQuestion(Question question) {
+  /// Builds an item from a documented question.
+  ///
+  /// [id] defaults to the question id, but callers that select across units
+  /// must pass the globally unique option id (question ids repeat per unit).
+  factory ExamTheoryItem.fromQuestion(Question question, {String? id}) {
     return ExamTheoryItem(
-      id: question.id,
+      id: id ?? question.id,
       kind: question.kind,
       prompt: question.prompt,
       options: List<String>.unmodifiable(question.options),

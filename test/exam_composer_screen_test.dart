@@ -42,13 +42,21 @@ Future<AppState> pumpComposer(
   return state;
 }
 
-/// The first documented question of each kind of the test grade.
-({Question trueFalse, Question choice, Question open}) firstQuestions(AppState state) {
-  final questions = state.library.unitsOf(testGrade).expand((LearningUnit unit) => unit.questions);
+/// The first documented question of each kind of the test grade, as offered
+/// options (their ids are the globally unique selection keys).
+({ExamQuestionOption trueFalse, ExamQuestionOption choice, ExamQuestionOption open})
+firstQuestions(AppState state) {
+  final options = examQuestionOptions(state.library.unitsOf(testGrade));
   return (
-    trueFalse: questions.firstWhere((Question q) => q.kind == QuestionKind.trueFalse),
-    choice: questions.firstWhere((Question q) => q.kind == QuestionKind.choice),
-    open: questions.firstWhere((Question q) => q.kind == QuestionKind.open),
+    trueFalse: options.firstWhere(
+      (ExamQuestionOption option) => option.question.kind == QuestionKind.trueFalse,
+    ),
+    choice: options.firstWhere(
+      (ExamQuestionOption option) => option.question.kind == QuestionKind.choice,
+    ),
+    open: options.firstWhere(
+      (ExamQuestionOption option) => option.question.kind == QuestionKind.open,
+    ),
   );
 }
 

@@ -19,7 +19,12 @@ class ExamQuestionOption {
   final String unitId;
   final String unitTitle;
 
-  String get id => question.id;
+  /// Globally unique identifier of the source question.
+  ///
+  /// Question ids in the curriculum are only unique inside their unit
+  /// (`q1` … `q9` repeat in every unit), so the unit id is part of the key.
+  /// Selections and widget keys rely on this being unique across the grade.
+  String get id => '$unitId:${question.id}';
 }
 
 /// Offered questions of every kind, in curriculum order: units in their

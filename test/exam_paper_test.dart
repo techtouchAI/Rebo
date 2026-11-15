@@ -150,13 +150,23 @@ void main() {
       final options = examQuestionOptions(units);
       final expected = <String>[
         for (final LearningUnit unit in units)
-          for (final Question question in unit.questions) question.id,
+          for (final Question question in unit.questions) '${unit.id}:${question.id}',
       ];
       expect(options.map((ExamQuestionOption option) => option.id), expected);
       expect(
         options.map((ExamQuestionOption option) => option.unitTitle).toSet().length,
         units.length,
       );
+    });
+
+    test('gives every offered question a unique id', () async {
+      final library = await ensureLibrary();
+      final options = examQuestionOptions(library.unitsOf('g1'));
+      final ids = options.map((ExamQuestionOption option) => option.id).toList();
+      // Question ids repeat per unit in the source file (q1..q9), so the
+      // option id must combine the unit id with the question id.
+      expect(ids.toSet().length, ids.length);
+      expect(ids.length, greaterThan(9));
     });
 
     test('sorts the prepared drawing topics by their document order', () async {
