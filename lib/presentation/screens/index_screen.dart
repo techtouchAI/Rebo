@@ -36,7 +36,7 @@ class _IndexScreenState extends State<IndexScreen> {
         children: <Widget>[
           AppPageHeader(
             title: 'الفهرس',
-            subtitle: 'وحدات ${state.gradeTitle} والدروس التطبيقية واللوحات',
+            subtitle: 'وحدات ${state.gradeTitle} والدروس التطبيقية واللوحات ورسوم الموضوعات',
             actions: <Widget>[
               IconButton(
                 tooltip: 'بحث',
