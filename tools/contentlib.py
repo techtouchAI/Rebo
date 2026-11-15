@@ -201,6 +201,37 @@ def read_docx_plain_text(path: Path) -> str:
     return "\n".join(chunks)
 
 
+def read_docx_media(path: Path) -> List[Tuple[str, bytes]]:
+    """Images of a DOCX in the order they appear in the document body.
+
+    Returns ``(relationship target, bytes)`` pairs, e.g.
+    ``("media/image1.png", b"...")``. The order follows the ``r:embed``
+    references of ``word/document.xml`` rather than the zip directory, so a page
+    keeps the position it has in the document.
+    """
+    with zipfile.ZipFile(path) as archive:
+        names = set(archive.namelist())
+        targets: Dict[str, str] = {}
+        rels_path = "word/_rels/document.xml.rels"
+        if rels_path in names:
+            rels_xml = ET.fromstring(archive.read(rels_path))
+            for rel in rels_xml:
+                targets[rel.attrib["Id"]] = rel.attrib["Target"]
+        document = archive.read("word/document.xml").decode("utf-8")
+        media: List[Tuple[str, bytes]] = []
+        seen = set()
+        for rel_id in re.findall(r'r:embed="([^"]+)"', document):
+            target = targets.get(rel_id)
+            if target is None or target in seen:
+                continue
+            member = f"word/{target}" if not target.startswith("word/") else target
+            if member not in names:
+                continue
+            seen.add(target)
+            media.append((target, archive.read(member)))
+    return media
+
+
 # Keep python-docx style helpers if a caller passes a python-docx Document.
 def iter_body(document) -> Iterator[tuple]:
     """Yield ``("p", Paragraph)`` / ``("tbl", Table)`` in real body order."""

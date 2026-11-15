@@ -25,6 +25,7 @@ flutter:
     - assets/content/
     - assets/illustrations/
     - assets/images/plates/
+    - assets/images/drawings/
     - assets/branding/
   fonts:
     - family: Almarai

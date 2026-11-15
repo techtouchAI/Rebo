@@ -336,11 +336,13 @@ class _SectionCard extends StatelessWidget {
     final accent = switch (section.kind) {
       'intro' => AppColors.fromAccent('secondary', isDark),
       'lessons' => AppColors.fromAccent('green', isDark),
+      'drawings' => AppColors.fromAccent('ink', isDark),
       'plates' => AppColors.fromAccent('gold', isDark),
       _ => AppColors.fromAccent('primary', isDark),
     };
     final count = switch (section.kind) {
       'lessons' => state.library.lessons.length,
+      'drawings' => state.visibleDrawings.length,
       'plates' => state.visiblePlates.length,
       'theatre' => state.theatreUnit?.topics.length ?? 0,
       _ => state.library.unitsOf(section.id).length,
@@ -377,6 +379,7 @@ class _SectionCard extends StatelessWidget {
                   Text(
                     '${toArabicDigits('$count')} ${switch (section.kind) {
                       'lessons' => 'دروس',
+                      'drawings' => 'رسوم',
                       'plates' => 'لوحة',
                       'theatre' => 'موضوعات',
                       _ => 'وحدات',
@@ -413,6 +416,9 @@ class _SectionCard extends StatelessWidget {
       case 'lessons':
         AppRoutes.openLessons(context);
         break;
+      case 'drawings':
+        AppRoutes.openDrawings(context);
+        break;
       case 'plates':
         AppRoutes.openPlates(context);
         break;
@@ -438,6 +444,8 @@ class _SectionCard extends StatelessWidget {
         return Icons.theater_comedy_outlined;
       case 'lessons':
         return Icons.edit_note_outlined;
+      case 'drawings':
+        return Icons.brush_outlined;
       case 'plates':
         return Icons.image_outlined;
       default:
@@ -457,6 +465,7 @@ class _ShortcutsRow extends StatelessWidget {
       _Shortcut('المصطلحات الفنية', Icons.translate_outlined, () => AppRoutes.openGlossary(context)),
       _Shortcut('المفضلة', Icons.bookmark_border, () => AppRoutes.openFavorites(context)),
       _Shortcut('دروس تطبيقية', Icons.edit_note_outlined, () => AppRoutes.openLessons(context)),
+      _Shortcut('موضوعات مصوّرة', Icons.brush_outlined, () => AppRoutes.openDrawings(context)),
       _Shortcut('بحث شامل', Icons.search, () => AppRoutes.openSearch(context)),
     ];
     return Wrap(
@@ -503,8 +512,8 @@ class _FooterNote extends StatelessWidget {
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
-              'وحدات التربية الفنية للمرحلة المتوسطة ودروسها التطبيقية ولوحاتها ومفردات '
-              'الأنشطة المسرحية. يعمل التطبيق دون اتصال بالإنترنت بالكامل بعد التثبيت.',
+              'وحدات التربية الفنية للمرحلة المتوسطة ودروسها التطبيقية ولوحاتها ورسوم موضوعاتها '
+              'ومفردات الأنشطة المسرحية. يعمل التطبيق دون اتصال بالإنترنت بالكامل بعد التثبيت.',
               style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13),
             ),
           ),

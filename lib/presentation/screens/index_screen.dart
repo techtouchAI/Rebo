@@ -36,7 +36,7 @@ class _IndexScreenState extends State<IndexScreen> {
         children: <Widget>[
           AppPageHeader(
             title: 'الفهرس',
-            subtitle: 'وحدات ${state.gradeTitle} والدروس التطبيقية واللوحات',
+            subtitle: 'وحدات ${state.gradeTitle} والدروس التطبيقية واللوحات ورسوم الموضوعات',
             actions: <Widget>[
               IconButton(
                 tooltip: 'بحث',
@@ -180,6 +180,22 @@ class _SectionBlock extends StatelessWidget {
             _UnitTile(unit: theatre, state: state),
           ],
         ),
+      );
+    }
+    if (section.kind == 'drawings') {
+      return _ExtraSection(
+        title: section.title,
+        subtitle: '${toArabicDigits('${state.visibleDrawings.length}')} موضوعاً مصوّراً',
+        icon: Icons.brush_outlined,
+        entries: state.visibleDrawings
+            .map((TopicDrawing drawing) => _ExtraEntry(
+                  title: drawing.title,
+                  subtitle: drawing.caption,
+                  onTap: () => AppRoutes.openDrawing(context, drawing),
+                ))
+            .toList(growable: false),
+        matchesQuery: query,
+        filter: filter,
       );
     }
     if (section.kind == 'plates') {

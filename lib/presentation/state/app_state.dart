@@ -184,7 +184,11 @@ class AppState extends ChangeNotifier {
       ...library.sections.where((item) => item.kind == 'intro'),
       if (section != null) section,
       ...library.sections.where(
-        (item) => item.kind == 'lessons' || item.kind == 'theatre' || item.kind == 'plates',
+        (item) =>
+            item.kind == 'lessons' ||
+            item.kind == 'theatre' ||
+            item.kind == 'drawings' ||
+            item.kind == 'plates',
       ),
     ];
     return result;
@@ -208,6 +212,32 @@ class AppState extends ChangeNotifier {
     final visible = visibleUnitIds;
     return library.plates
         .where((plate) => visible.contains(plate.unitId))
+        .toList(growable: false);
+  }
+
+  /// The topic drawings of the chosen grade, in document order.
+  List<TopicDrawing> get visibleDrawings {
+    final id = _progress.gradeId;
+    if (id == null) {
+      return library.drawings;
+    }
+    final visible = visibleUnitIds;
+    return library.drawings
+        .where((drawing) => visible.contains(drawing.unitId))
+        .toList(growable: false);
+  }
+
+  /// Drawings attached to one topic of a visible unit.
+  List<TopicDrawing> drawingsOfTopic(String unitId, String topicId) {
+    return visibleDrawings
+        .where((drawing) => drawing.unitId == unitId && drawing.topicId == topicId)
+        .toList(growable: false);
+  }
+
+  /// Drawings attached to one unit, in document order.
+  List<TopicDrawing> drawingsOfUnit(String unitId) {
+    return visibleDrawings
+        .where((drawing) => drawing.unitId == unitId)
         .toList(growable: false);
   }
 

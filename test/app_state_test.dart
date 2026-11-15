@@ -123,6 +123,34 @@ void main() {
     expect(repository.lastSaved?.gradeId, isNull);
   });
 
+  test('the grade limits the topic drawings like the plates and the glossary', () async {
+    final state = buildState(library: library, progress: ReadingProgress(gradeId: 'g2'));
+    expect(state.visibleDrawings.length, 6);
+    expect(
+      state.visibleDrawings.every(
+        (TopicDrawing drawing) => state.visibleUnitIds.contains(drawing.unitId),
+      ),
+      isTrue,
+    );
+    expect(
+      state.visibleDrawings.any((TopicDrawing drawing) => drawing.unitId.startsWith('g1')),
+      isFalse,
+    );
+    expect(state.drawingsOfUnit('g2-u2').length, 4);
+    expect(state.drawingsOfTopic('g2-u2', 't3').length, 2);
+    expect(state.drawingsOfUnit('g1-u2'), isEmpty);
+
+    await state.setGrade('g1');
+    expect(state.visibleDrawings.length, 7);
+    expect(
+      state.visibleDrawings.every((TopicDrawing drawing) => drawing.grade == 'الصف الأول المتوسط'),
+      isTrue,
+    );
+
+    await state.setGrade(null);
+    expect(state.visibleDrawings.length, library.drawings.length);
+  });
+
   test('resetting the reading data keeps the chosen grade and look', () async {
     final state = buildState(
       library: library,

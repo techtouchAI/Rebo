@@ -4,6 +4,7 @@ import '../../../core/theme/dimens.dart';
 import '../../../core/utils/arabic_text.dart';
 import '../../../domain/models/library.dart';
 import '../topic_card.dart';
+import '../topic_drawing_card.dart';
 
 /// Renders the body of a unit with a layout that follows the nature of its
 /// content. Every topic is always rendered; the template only changes the way
@@ -13,36 +14,55 @@ class UnitSections extends StatelessWidget {
     super.key,
     required this.unit,
     required this.accent,
+    this.drawings = const <TopicDrawing>[],
   });
 
   final LearningUnit unit;
   final Color accent;
 
+  /// The topic drawings of the unit, shown at the start of their topic.
+  final List<TopicDrawing> drawings;
+
+  /// Drawings of one topic, in document order.
+  List<TopicDrawing> drawingsOf(Topic topic) {
+    return drawings
+        .where((TopicDrawing drawing) => drawing.topicId == topic.id)
+        .toList(growable: false);
+  }
+
   @override
   Widget build(BuildContext context) {
     switch (unit.template) {
       case PresentationTemplate.comparison:
-        return _ComparisonSections(unit: unit, accent: accent);
+        return _ComparisonSections(unit: unit, accent: accent, drawings: drawingsOf);
       case PresentationTemplate.materials:
-        return _MaterialsSections(unit: unit, accent: accent);
+        return _MaterialsSections(unit: unit, accent: accent, drawings: drawingsOf);
       case PresentationTemplate.process:
-        return _ProcessSections(unit: unit, accent: accent);
+        return _ProcessSections(unit: unit, accent: accent, drawings: drawingsOf);
       case PresentationTemplate.timeline:
-        return _TimelineSections(unit: unit, accent: accent);
+        return _TimelineSections(unit: unit, accent: accent, drawings: drawingsOf);
       case PresentationTemplate.concept:
       case PresentationTemplate.lesson:
-        return _ConceptSections(unit: unit, accent: accent);
+        return _ConceptSections(unit: unit, accent: accent, drawings: drawingsOf);
     }
   }
 }
 
+/// Shared signature of the per-topic drawing lookup used by every template.
+typedef TopicDrawingsOf = List<TopicDrawing> Function(Topic topic);
+
 // ------------------------------------------------------------------ concept --
 
 class _ConceptSections extends StatelessWidget {
-  const _ConceptSections({required this.unit, required this.accent});
+  const _ConceptSections({
+    required this.unit,
+    required this.accent,
+    required this.drawings,
+  });
 
   final LearningUnit unit;
   final Color accent;
+  final TopicDrawingsOf drawings;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +76,7 @@ class _ConceptSections extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        TopicDrawings(drawings: drawings(first), accent: accent),
         if (hasDefinition)
           _DefinitionPanel(
             title: first.title,
@@ -71,7 +92,13 @@ class _ConceptSections extends StatelessWidget {
         ...rest.map(
           (Topic topic) => Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.md),
-            child: TopicCard(topic: topic, accent: accent),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                TopicDrawings(drawings: drawings(topic), accent: accent),
+                TopicCard(topic: topic, accent: accent),
+              ],
+            ),
           ),
         ),
       ],
@@ -184,10 +211,15 @@ class _DefinitionPanel extends StatelessWidget {
 // --------------------------------------------------------------- comparison --
 
 class _ComparisonSections extends StatelessWidget {
-  const _ComparisonSections({required this.unit, required this.accent});
+  const _ComparisonSections({
+    required this.unit,
+    required this.accent,
+    required this.drawings,
+  });
 
   final LearningUnit unit;
   final Color accent;
+  final TopicDrawingsOf drawings;
 
   @override
   Widget build(BuildContext context) {
@@ -198,15 +230,22 @@ class _ComparisonSections extends StatelessWidget {
           final rows = _labelValueRows(topic.bullets);
           return Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.md),
-            child: rows.length >= 2
-                ? _ComparisonTable(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                TopicDrawings(drawings: drawings(topic), accent: accent),
+                if (rows.length >= 2)
+                  _ComparisonTable(
                     title: topic.title,
                     rows: rows,
                     accent: accent,
                     footnote: topic.listTitle,
                     footItems: topic.listItems,
                   )
-                : TopicCard(topic: topic, accent: accent),
+                else
+                  TopicCard(topic: topic, accent: accent),
+              ],
+            ),
           );
         }),
       ],
@@ -345,10 +384,15 @@ _KeyValue? _splitLabel(String bullet) {
 // ---------------------------------------------------------------- materials --
 
 class _MaterialsSections extends StatelessWidget {
-  const _MaterialsSections({required this.unit, required this.accent});
+  const _MaterialsSections({
+    required this.unit,
+    required this.accent,
+    required this.drawings,
+  });
 
   final LearningUnit unit;
   final Color accent;
+  final TopicDrawingsOf drawings;
 
   @override
   Widget build(BuildContext context) {
@@ -359,7 +403,15 @@ class _MaterialsSections extends StatelessWidget {
           columns: columns,
           spacing: AppSpacing.md,
           children: unit.topics
-              .map((Topic topic) => _MaterialTile(topic: topic, accent: accent))
+              .map(
+                (Topic topic) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    TopicDrawings(drawings: drawings(topic), accent: accent),
+                    _MaterialTile(topic: topic, accent: accent),
+                  ],
+                ),
+              )
               .toList(growable: false),
         );
       },
@@ -429,10 +481,15 @@ class _MaterialTile extends StatelessWidget {
 // ------------------------------------------------------------------ process --
 
 class _ProcessSections extends StatelessWidget {
-  const _ProcessSections({required this.unit, required this.accent});
+  const _ProcessSections({
+    required this.unit,
+    required this.accent,
+    required this.drawings,
+  });
 
   final LearningUnit unit;
   final Color accent;
+  final TopicDrawingsOf drawings;
 
   @override
   Widget build(BuildContext context) {
@@ -445,6 +502,7 @@ class _ProcessSections extends StatelessWidget {
             topic: unit.topics[i],
             accent: accent,
             isLast: i == unit.topics.length - 1,
+            drawings: drawings(unit.topics[i]),
           ),
       ],
     );
@@ -457,17 +515,18 @@ class _ProcessStep extends StatelessWidget {
     required this.topic,
     required this.accent,
     required this.isLast,
+    this.drawings = const <TopicDrawing>[],
   });
 
   final int index;
   final Topic topic;
   final Color accent;
   final bool isLast;
+  final List<TopicDrawing> drawings;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -504,46 +563,12 @@ class _ProcessStep extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-              child: Container(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                decoration: BoxDecoration(
-                  color: scheme.surface,
-                  borderRadius: BorderRadius.circular(AppRadii.md),
-                  border: Border.all(color: scheme.outlineVariant),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Row(
-                      children: <Widget>[
-                        Icon(iconForTopic(topic.title), size: 18, color: accent),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(topic.title, style: theme.textTheme.titleLarge)),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    ...topic.bullets.map(
-                      (String bullet) => Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Text(bullet, style: theme.textTheme.bodyLarge),
-                      ),
-                    ),
-                    if (topic.listItems.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: AppSpacing.sm),
-                        child: Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: topic.listItems
-                              .map((String item) => Chip(
-                                    label: Text(item),
-                                    visualDensity: VisualDensity.compact,
-                                  ))
-                              .toList(growable: false),
-                        ),
-                      ),
-                  ],
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  TopicDrawings(drawings: drawings, accent: accent),
+                  _StepCard(topic: topic, accent: accent),
+                ],
               ),
             ),
           ),
@@ -553,13 +578,72 @@ class _ProcessStep extends StatelessWidget {
   }
 }
 
+class _StepCard extends StatelessWidget {
+  const _StepCard({required this.topic, required this.accent});
+
+  final Topic topic;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(iconForTopic(topic.title), size: 18, color: accent),
+              const SizedBox(width: 8),
+              Expanded(child: Text(topic.title, style: theme.textTheme.titleLarge)),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          ...topic.bullets.map(
+            (String bullet) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(bullet, style: theme.textTheme.bodyLarge),
+            ),
+          ),
+          if (topic.listItems.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: topic.listItems
+                    .map((String item) => Chip(
+                          label: Text(item),
+                          visualDensity: VisualDensity.compact,
+                        ))
+                    .toList(growable: false),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 // ----------------------------------------------------------------- timeline --
 
 class _TimelineSections extends StatelessWidget {
-  const _TimelineSections({required this.unit, required this.accent});
+  const _TimelineSections({
+    required this.unit,
+    required this.accent,
+    required this.drawings,
+  });
 
   final LearningUnit unit;
   final Color accent;
+  final TopicDrawingsOf drawings;
 
   @override
   Widget build(BuildContext context) {
@@ -574,7 +658,13 @@ class _TimelineSections extends StatelessWidget {
         ...unit.topics.map(
           (Topic topic) => Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.md),
-            child: TopicCard(topic: topic, accent: accent),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                TopicDrawings(drawings: drawings(topic), accent: accent),
+                TopicCard(topic: topic, accent: accent),
+              ],
+            ),
           ),
         ),
       ],

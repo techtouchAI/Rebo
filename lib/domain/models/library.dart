@@ -564,6 +564,56 @@ class Plate {
   }
 }
 
+/// One picture of a curriculum topic: a single drawing that shows what the
+/// topic is about (the source booklet has exactly one picture per topic).
+///
+/// The drawing is attached to the topic it illustrates, so the reader can show
+/// it at the start of that topic, while the gallery lists every drawing of the
+/// chosen grade.
+class TopicDrawing {
+  const TopicDrawing({
+    required this.id,
+    required this.order,
+    required this.title,
+    required this.asset,
+    required this.unitId,
+    required this.unitTitle,
+    required this.topicId,
+    required this.topicTitle,
+    required this.grade,
+    required this.caption,
+  });
+
+  final String id;
+  final int order;
+  final String title;
+  final String asset;
+  final String unitId;
+  final String unitTitle;
+  final String topicId;
+  final String topicTitle;
+  final String grade;
+  final String caption;
+
+  /// Everything the drawing says, for the offline search index.
+  String get searchableText => '$title $caption $topicTitle $unitTitle $grade';
+
+  factory TopicDrawing.fromJson(Map<String, dynamic> json) {
+    return TopicDrawing(
+      id: json['id'] as String? ?? '',
+      order: json['order'] as int? ?? 0,
+      title: json['title'] as String? ?? '',
+      asset: json['asset'] as String? ?? '',
+      unitId: json['unitId'] as String? ?? '',
+      unitTitle: json['unitTitle'] as String? ?? '',
+      topicId: json['topicId'] as String? ?? '',
+      topicTitle: json['topicTitle'] as String? ?? '',
+      grade: json['grade'] as String? ?? '',
+      caption: json['caption'] as String? ?? '',
+    );
+  }
+}
+
 /// A section of the table of contents.
 class ContentSection {
   const ContentSection({
@@ -600,6 +650,7 @@ class Library {
     required this.lessons,
     required this.glossary,
     required this.plates,
+    required this.drawings,
   });
 
   final String title;
@@ -609,6 +660,7 @@ class Library {
   final List<LessonPlan> lessons;
   final List<GlossaryTerm> glossary;
   final List<Plate> plates;
+  final List<TopicDrawing> drawings;
 
   List<LearningUnit> unitsOf(String sectionId) {
     return units.where((unit) => unit.sectionId == sectionId).toList(growable: false);
@@ -641,6 +693,29 @@ class Library {
     return null;
   }
 
+  TopicDrawing? drawingById(String id) {
+    for (final drawing in drawings) {
+      if (drawing.id == id) {
+        return drawing;
+      }
+    }
+    return null;
+  }
+
+  /// The drawings attached to one topic, in document order.
+  List<TopicDrawing> drawingsOfTopic(String unitId, String topicId) {
+    return drawings
+        .where((drawing) => drawing.unitId == unitId && drawing.topicId == topicId)
+        .toList(growable: false);
+  }
+
+  /// The drawings attached to one unit, in document order.
+  List<TopicDrawing> drawingsOfUnit(String unitId) {
+    return drawings
+        .where((drawing) => drawing.unitId == unitId)
+        .toList(growable: false);
+  }
+
   /// Reading order used by the previous/next navigation.
   List<String> get readingOrder {
     final ids = <String>[];
@@ -661,6 +736,7 @@ class Library {
     Map<String, dynamic> lessonsJson,
     Map<String, dynamic> glossaryJson,
     Map<String, dynamic> platesJson,
+    Map<String, dynamic> drawingsJson,
   ) {
     final sections = (curriculum['sections'] as List<dynamic>? ?? const <dynamic>[])
         .map((item) => ContentSection.fromJson(item as Map<String, dynamic>))
@@ -679,6 +755,10 @@ class Library {
     final plates = (platesJson['plates'] as List<dynamic>? ?? const <dynamic>[])
         .map((item) => Plate.fromJson(item as Map<String, dynamic>))
         .toList(growable: false);
+    final drawings = (drawingsJson['drawings'] as List<dynamic>? ?? const <dynamic>[])
+        .map((item) => TopicDrawing.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false)
+      ..sort((a, b) => a.order.compareTo(b.order));
     return Library(
       title: curriculum['title'] as String? ?? 'مِرسم',
       subtitle: curriculum['subtitle'] as String? ?? '',
@@ -687,6 +767,7 @@ class Library {
       lessons: lessons,
       glossary: glossary,
       plates: plates,
+      drawings: drawings,
     );
   }
 }
@@ -701,10 +782,12 @@ int _sectionWeight(String kind) {
       return 2;
     case 'theatre':
       return 3;
-    case 'plates':
+    case 'drawings':
       return 4;
-    default:
+    case 'plates':
       return 5;
+    default:
+      return 6;
   }
 }
 

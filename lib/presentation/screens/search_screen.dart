@@ -10,7 +10,7 @@ import '../navigation/app_routes.dart';
 import '../state/app_state.dart';
 import '../widgets/text_scale_controls.dart';
 
-/// Instant search across units, lessons, terms and plates.
+/// Instant search across units, lessons, terms, plates and topic drawings.
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
 
@@ -125,6 +125,11 @@ class _SearchScreenState extends State<SearchScreen> {
                       selected: _typeFilter == SearchHitType.plate,
                       onSelected: (_) => _applyType(SearchHitType.plate, state),
                     ),
+                    ChoiceChip(
+                      label: const Text('رسوم الموضوعات'),
+                      selected: _typeFilter == SearchHitType.drawing,
+                      onSelected: (_) => _applyType(SearchHitType.drawing, state),
+                    ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -133,7 +138,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     icon: Icons.search,
                     title: 'ابحث في كامل المحتوى',
                     message: 'يشمل البحث عناوين الوحدات والموضوعات والمصطلحات واللوحات '
-                        'والدروس التطبيقية، ويعمل دون اتصال بالإنترنت.',
+                        'ورسوم الموضوعات والدروس التطبيقية، ويعمل دون اتصال بالإنترنت.',
                   )
                 else if (visible.isEmpty)
                   EmptyState(
@@ -187,6 +192,9 @@ class _SearchScreenState extends State<SearchScreen> {
       case SearchHitType.plate:
         AppRoutes.openPlateById(context, hit.id);
         break;
+      case SearchHitType.drawing:
+        AppRoutes.openDrawingById(context, hit.id);
+        break;
     }
   }
 }
@@ -206,6 +214,7 @@ class _HitTile extends StatelessWidget {
       SearchHitType.lesson => Icons.edit_note_outlined,
       SearchHitType.term => Icons.translate,
       SearchHitType.plate => Icons.image_outlined,
+      SearchHitType.drawing => Icons.brush_outlined,
     };
     return Material(
       color: scheme.surface,

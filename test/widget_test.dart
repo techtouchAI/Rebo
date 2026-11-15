@@ -3,15 +3,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mirsam/core/utils/arabic_text.dart';
 import 'package:mirsam/domain/models/library.dart';
 import 'package:mirsam/domain/models/progress.dart';
+import 'package:mirsam/presentation/screens/drawing_viewer_screen.dart';
+import 'package:mirsam/presentation/screens/drawings_screen.dart';
 import 'package:mirsam/presentation/screens/grade_picker_screen.dart';
 import 'package:mirsam/presentation/screens/home_screen.dart';
 import 'package:mirsam/presentation/screens/settings_screen.dart';
 import 'package:mirsam/presentation/screens/glossary_screen.dart';
 import 'package:mirsam/presentation/screens/index_screen.dart';
 import 'package:mirsam/presentation/screens/lesson_screen.dart';
+import 'package:mirsam/presentation/screens/plates_screen.dart';
 import 'package:mirsam/presentation/screens/quiz_screen.dart';
 import 'package:mirsam/presentation/screens/search_screen.dart';
 import 'package:mirsam/presentation/screens/unit_screen.dart';
+import 'package:mirsam/presentation/widgets/topic_drawing_card.dart';
 import 'package:mirsam/presentation/widgets/unit_switcher_bar.dart';
 
 import 'overflow_utils.dart';
@@ -84,12 +88,78 @@ void main() {
     await pumpScreen(
       tester,
       const UnitScreen(unitId: 'g1-u2'),
-      size: const Size(900, 4000),
+      size: const Size(900, 9000),
     );
 
     expect(find.text('لوحات الوحدة'), findsOneWidget);
     expect(find.text('نماذج زخرفية من الدليل'), findsOneWidget);
     expect(find.text('أمثلة للوحدات الزخرفية'), findsOneWidget);
+  });
+
+  testWidgets('the topic drawings are their own section on the home page',
+      (WidgetTester tester) async {
+    // A tall window so the whole section grid is laid out, not only its first row.
+    await pumpApplication(tester, size: const Size(1280, 1600));
+
+    expect(find.text('أقسام التطبيق'), findsOneWidget);
+    // The section card of the home page and its shortcut carry the title.
+    expect(find.text('موضوعات مصوّرة'), findsWidgets);
+  });
+
+  testWidgets('the drawings gallery lists the pictures of the chosen grade',
+      (WidgetTester tester) async {
+    await pumpScreen(tester, const DrawingsScreen(), size: const Size(900, 3000));
+
+    expect(find.byType(DrawingsScreen), findsOneWidget);
+    expect(find.text('تصميم غلاف كتاب'), findsOneWidget);
+    expect(find.text('رسم موضوع من الطبيعة'), findsOneWidget);
+    // Nothing of the other grades may appear.
+    expect(find.text('رسم أشكال هندسية منتظمة'), findsNothing);
+    expect(find.text('رسم جسم مع إظهار الضوء والظل'), findsNothing);
+  });
+
+  testWidgets('the plates gallery groups the plates and the drawings by topic',
+      (WidgetTester tester) async {
+    await pumpScreen(tester, const PlatesScreen(), size: const Size(900, 4000));
+
+    expect(find.byType(PlatesScreen), findsOneWidget);
+    expect(find.text('لوحات الوحدات'), findsOneWidget);
+    expect(find.text('رسوم الموضوعات'), findsOneWidget);
+    expect(find.text('نماذج زخرفية من الدليل'), findsOneWidget);
+    expect(find.text('تكوين زخرفي يعتمد على التكرار'), findsOneWidget);
+  });
+
+  testWidgets('a topic drawing opens full screen with its topic',
+      (WidgetTester tester) async {
+    await pumpScreen(
+      tester,
+      const DrawingViewerScreen(drawingId: 'drawing-01'),
+      size: const Size(900, 1200),
+    );
+
+    expect(find.byType(DrawingViewerScreen), findsOneWidget);
+    expect(find.text('تصميم غلاف كتاب'), findsOneWidget);
+    expect(find.textContaining('الموضوع: أنواع التصميم'), findsOneWidget);
+    expect(find.byTooltip('تكبير الخط'), findsOneWidget);
+  });
+
+  testWidgets('a drawing is shown at the start of the topic it illustrates',
+      (WidgetTester tester) async {
+    await pumpScreen(
+      tester,
+      const UnitScreen(unitId: 'g1-u2'),
+      size: const Size(900, 9000),
+    );
+
+    expect(find.byType(TopicDrawingCard), findsNWidgets(6));
+    // «أنواع التصميم» carries three pages of the booklet, all above the table.
+    final topicHeader = find.text('أنواع التصميم');
+    expect(topicHeader, findsOneWidget);
+    final firstDrawing = tester.getTopLeft(find.byType(TopicDrawingCard).first).dy;
+    expect(firstDrawing, lessThan(tester.getTopLeft(topicHeader).dy));
+    expect(find.text('تصميم غلاف كتاب'), findsOneWidget);
+    expect(find.text('تصميم بطاقة معايدة'), findsOneWidget);
+    expect(find.text('تصميم بطاقة دعوة'), findsOneWidget);
   });
 
   testWidgets('the settings page switches the reading font', (WidgetTester tester) async {
