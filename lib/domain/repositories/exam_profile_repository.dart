@@ -45,6 +45,10 @@ class ExamProfile {
           json['headingFontSize'],
           ExamPaperTypography.defaultHeadingFontSize,
         ),
+        lineSpacingPercent: _spacingFromJson(
+          json['lineSpacingPercent'],
+          ExamPaperTypography.defaultLineSpacingPercent,
+        ),
       ),
     );
   }
@@ -59,6 +63,7 @@ class ExamProfile {
       'headerFontSize': typography.headerFontSize,
       'bodyFontSize': typography.bodyFontSize,
       'headingFontSize': typography.headingFontSize,
+      'lineSpacingPercent': typography.lineSpacingPercent,
     };
   }
 
@@ -92,6 +97,13 @@ class ExamProfile {
   static int _sizeFromJson(Object? value, int fallback) {
     final size = value is int ? value : int.tryParse('${value ?? ''}');
     return ExamPaperTypography.isValidFontSize(size) ? size! : fallback;
+  }
+
+  /// Same guard for the line spacing, so profiles saved before the option
+  /// existed (or with a corrupt value) still produce a valid paper.
+  static int _spacingFromJson(Object? value, int fallback) {
+    final percent = value is int ? value : int.tryParse('${value ?? ''}');
+    return ExamPaperTypography.isValidLineSpacing(percent) ? percent! : fallback;
   }
 }
 

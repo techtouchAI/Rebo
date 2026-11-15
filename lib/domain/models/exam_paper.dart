@@ -44,34 +44,58 @@ class ExamPaperTypography {
     this.headerFontSize = defaultHeaderFontSize,
     this.bodyFontSize = defaultBodyFontSize,
     this.headingFontSize = defaultHeadingFontSize,
+    this.lineSpacingPercent = defaultLineSpacingPercent,
   });
 
   /// Matches the official paper: 12 pt header, 14 pt questions, 16 pt section
-  /// titles.
+  /// titles and the `multiple 1.15` spacing Word writes for `line: 360`.
   static const int defaultHeaderFontSize = 12;
   static const int defaultBodyFontSize = 14;
   static const int defaultHeadingFontSize = 16;
   static const int minFontSize = 8;
   static const int maxFontSize = 32;
 
+  /// Line spacing as a percentage of the default, so 100 % keeps the official
+  /// layout. Lower values tighten the paper and fit more questions per page.
+  static const int defaultLineSpacingPercent = 100;
+  static const int minLineSpacingPercent = 50;
+  static const int maxLineSpacingPercent = 200;
+
+  /// `w:line` value of the default spacing (240ths of a line, `auto` rule).
+  static const int baseLineTwips = 360;
+
   final ExamPaperFont font;
   final int headerFontSize;
   final int bodyFontSize;
   final int headingFontSize;
+  final int lineSpacingPercent;
 
   static bool isValidFontSize(int? size) =>
       size != null &&
       size >= minFontSize &&
       size <= maxFontSize;
 
+  static bool isValidLineSpacing(int? percent) =>
+      percent != null &&
+      percent >= minLineSpacingPercent &&
+      percent <= maxLineSpacingPercent;
+
   bool get isValid =>
       isValidFontSize(headerFontSize) &&
       isValidFontSize(bodyFontSize) &&
-      isValidFontSize(headingFontSize);
+      isValidFontSize(headingFontSize) &&
+      isValidLineSpacing(lineSpacingPercent);
 
   int get headerHalfPoints => headerFontSize * 2;
   int get bodyHalfPoints => bodyFontSize * 2;
   int get headingHalfPoints => headingFontSize * 2;
+
+  /// The `w:line` of the tightened or widened text, in 240ths of a line.
+  int get lineTwips => (baseLineTwips * lineSpacingPercent / 100).round();
+
+  /// True when the user kept the default spacing, so the document matches the
+  /// official paper exactly.
+  bool get usesDefaultLineSpacing => lineSpacingPercent == defaultLineSpacingPercent;
 
   /// The separator lines are drawn two points above the section titles, as in
   /// the official paper.
@@ -82,12 +106,14 @@ class ExamPaperTypography {
     int? headerFontSize,
     int? bodyFontSize,
     int? headingFontSize,
+    int? lineSpacingPercent,
   }) {
     return ExamPaperTypography(
       font: font ?? this.font,
       headerFontSize: headerFontSize ?? this.headerFontSize,
       bodyFontSize: bodyFontSize ?? this.bodyFontSize,
       headingFontSize: headingFontSize ?? this.headingFontSize,
+      lineSpacingPercent: lineSpacingPercent ?? this.lineSpacingPercent,
     );
   }
 }
@@ -360,6 +386,9 @@ class ExamPaper {
     if (!typography.isValid) {
       issues.add(invalidFontSizes);
     }
+    if (!ExamPaperTypography.isValidLineSpacing(typography.lineSpacingPercent)) {
+      issues.add(invalidLineSpacing);
+    }
     if (!hasTheory) {
       issues.add(noTheory);
     }
@@ -390,6 +419,9 @@ class ExamPaper {
   static const String noPractical = 'أضف سؤالاً عملياً واحداً على الأقل';
   static const String invalidDegrees = 'أدخل درجات صحيحة بين ٠ و ١٠٠';
   static const String invalidFontSizes = 'أدخل أحجام خط صحيحة';
+  static const String invalidLineSpacing =
+      'أدخل نسبة تباعد أسطر بين ${ExamPaperTypography.minLineSpacingPercent} و'
+      ' ${ExamPaperTypography.maxLineSpacingPercent}';
 }
 
 /// `س1`, `س2`, … with Western digits, as in the official paper.

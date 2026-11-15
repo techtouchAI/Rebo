@@ -305,6 +305,14 @@ class _SectionsGrid extends StatelessWidget {
         subtitle: 'اختر الوحدات واطبع أسئلتها مع الإجابات',
         kind: 'question-printing',
       ),
+      // The question writer is an application feature too, kept beside the
+      // printing card so it is reachable without scrolling to the shortcuts.
+      const ContentSection(
+        id: 'exam-composer',
+        title: 'كتابة الأسئلة',
+        subtitle: 'اكتب ورقة امتحان وصدّرها ملف وورد مطابقاً للنموذج الرسمي',
+        kind: 'exam-composer',
+      ),
       ...state.visibleSections,
     ];
     return LayoutBuilder(
@@ -429,6 +437,9 @@ class _SectionCard extends StatelessWidget {
       case 'question-printing':
         AppRoutes.openQuestionPrinting(context);
         break;
+      case 'exam-composer':
+        AppRoutes.openExamComposer(context);
+        break;
       case 'lessons':
         AppRoutes.openLessons(context);
         break;
@@ -456,6 +467,8 @@ class _SectionCard extends StatelessWidget {
     switch (kind) {
       case 'question-printing':
         return Icons.print_outlined;
+      case 'exam-composer':
+        return Icons.note_add_outlined;
       case 'intro':
         return Icons.auto_stories_outlined;
       case 'theatre':
@@ -480,7 +493,6 @@ class _ShortcutsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <_Shortcut>[
-      _Shortcut('كتابة الأسئلة', Icons.note_add_outlined, () => AppRoutes.openExamComposer(context)),
       _Shortcut('المصطلحات الفنية', Icons.translate_outlined, () => AppRoutes.openGlossary(context)),
       _Shortcut('المفضلة', Icons.bookmark_border, () => AppRoutes.openFavorites(context)),
       _Shortcut('دروس تطبيقية', Icons.edit_note_outlined, () => AppRoutes.openLessons(context)),

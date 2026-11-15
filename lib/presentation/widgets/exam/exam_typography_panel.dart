@@ -56,6 +56,8 @@ class ExamTypographyPanel extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
+        _spacing(),
+        const SizedBox(height: AppSpacing.lg),
         _preview(context),
       ],
     );
@@ -121,6 +123,104 @@ class ExamTypographyPanel extends StatelessWidget {
     );
   }
 
+  /// Line spacing of the exported paper. Word expresses it as 240ths of a
+  /// line, so the slider works in percent of the official layout.
+  Widget _spacing() {
+    final percent = parseIntegerDigits(controllers.lineSpacing.text);
+    final valid = ExamPaperTypography.isValidLineSpacing(percent);
+    final current = valid ? percent! : ExamPaperTypography.defaultLineSpacingPercent;
+    final theme = Theme.of(context);
+    return ExamPanelCard(
+      title: 'تباعد الأسطر',
+      subtitle: 'قلّل النسبة لتقليل الفراغ بين الأسطر واستيعاب أسئلة أكثر في الصفحة.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          _spacingRow(current, valid, theme),
+          Slider(
+            key: const ValueKey<String>('exam-line-spacing-slider'),
+            value: current.toDouble(),
+            min: ExamPaperTypography.minLineSpacingPercent.toDouble(),
+            max: ExamPaperTypography.maxLineSpacingPercent.toDouble(),
+            divisions:
+                ExamPaperTypography.maxLineSpacingPercent -
+                ExamPaperTypography.minLineSpacingPercent,
+            label: '${toArabicDigits('$current')}٪',
+            onChanged: (double value) {
+              final next = value.round();
+              controllers.lineSpacing.text = '$next';
+              state.setLineSpacingPercent(next);
+            },
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              key: const ValueKey<String>('exam-line-spacing-reset'),
+              onPressed: state.lineSpacingPercent ==
+                      ExamPaperTypography.defaultLineSpacingPercent
+                  ? null
+                  : () {
+                      controllers.lineSpacing.text =
+                          '${ExamPaperTypography.defaultLineSpacingPercent}';
+                      state.resetLineSpacing();
+                    },
+              icon: const Icon(Icons.restart_alt, size: 18),
+              label: const Text('استعادة التباعد الرسمي'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The label and the percentage field sit side by side on wide panels and
+  /// stack on narrow phones so nothing overflows.
+  Widget _spacingRow(int current, bool valid, ThemeData theme) {
+    final label = Text(
+      valid
+          ? 'التباعد الحالي ${toArabicDigits('$current')}٪ من الأصل'
+          : 'أدخل نسبة بين '
+              '${toArabicDigits('${ExamPaperTypography.minLineSpacingPercent}')} و'
+              ' ${toArabicDigits('${ExamPaperTypography.maxLineSpacingPercent}')}',
+      key: const ValueKey<String>('exam-spacing-label'),
+      style: theme.textTheme.labelLarge?.copyWith(
+        color: valid ? null : theme.colorScheme.error,
+      ),
+    );
+    final field = ExamNumberField(
+      fieldKey: const ValueKey<String>('exam-line-spacing'),
+      label: 'النسبة ٪',
+      controller: controllers.lineSpacing,
+      min: ExamPaperTypography.minLineSpacingPercent,
+      max: ExamPaperTypography.maxLineSpacingPercent,
+      onChanged: () => state.setLineSpacingPercent(
+        parseIntegerDigits(controllers.lineSpacing.text),
+      ),
+    );
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        if (constraints.maxWidth >= 420) {
+          return Row(
+            children: <Widget>[
+              Expanded(child: label),
+              const SizedBox(width: AppSpacing.sm),
+              SizedBox(width: 130, child: field),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            label,
+            const SizedBox(height: AppSpacing.md),
+            field,
+          ],
+        );
+      },
+    );
+  }
+
   Widget _preview(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -149,12 +249,14 @@ class ExamTypographyPanel extends StatelessWidget {
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontSize: typography.headingFontSize.toDouble(),
                 fontWeight: FontWeight.bold,
+                height: _previewHeight(typography),
               ),
             ),
             Text(
               '1- ضع علامة صح امام العبارة الصحيحة',
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontSize: typography.bodyFontSize.toDouble(),
+                height: _previewHeight(typography),
               ),
             ),
           ],
@@ -165,4 +267,9 @@ class ExamTypographyPanel extends StatelessWidget {
 
   static int? _sizeOf(TextEditingController controller) =>
       parseIntegerDigits(controller.text);
+
+  /// Flutter's `height` is a multiplier of the font size; Word's `w:line` is
+  /// relative to the single line (240 twips), so the ratio maps directly.
+  static double _previewHeight(ExamPaperTypography typography) =>
+      typography.lineTwips / ExamPaperTypography.baseLineTwips;
 }

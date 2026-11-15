@@ -197,6 +197,10 @@ void main() {
       expect(restored.sectionName, 'ب');
       expect(restored.typography.font, ExamPaperFont.amiri);
       expect(restored.typography.bodyFontSize, 16);
+      expect(
+        restored.typography.lineSpacingPercent,
+        ExamPaperTypography.defaultLineSpacingPercent,
+      );
 
       final repaired = ExamProfile.fromJson(<String, dynamic>{
         'bodyFontSize': 99,
@@ -204,6 +208,79 @@ void main() {
       });
       expect(repaired.typography.bodyFontSize, ExamPaperTypography.defaultBodyFontSize);
       expect(repaired.typography.font, ExamPaperFont.traditionalArabic);
+    });
+  });
+
+  group('line spacing', () {
+    test('keeps the official layout at the default percentage', () {
+      const typography = ExamPaperTypography();
+      expect(typography.usesDefaultLineSpacing, isTrue);
+      expect(typography.lineTwips, ExamPaperTypography.baseLineTwips);
+      expect(typography.lineTwips, 360);
+    });
+
+    test('tightens and widens the spacing proportionally', () {
+      const tight = ExamPaperTypography(lineSpacingPercent: 50);
+      const wide = ExamPaperTypography(lineSpacingPercent: 200);
+      expect(tight.lineTwips, 180);
+      expect(wide.lineTwips, 720);
+      expect(tight.usesDefaultLineSpacing, isFalse);
+      expect(tight.isValid, isTrue);
+    });
+
+    test('rejects percentages outside the supported range', () {
+      expect(ExamPaperTypography.isValidLineSpacing(null), isFalse);
+      expect(ExamPaperTypography.isValidLineSpacing(49), isFalse);
+      expect(ExamPaperTypography.isValidLineSpacing(201), isFalse);
+      expect(ExamPaperTypography.isValidLineSpacing(50), isTrue);
+      expect(ExamPaperTypography.isValidLineSpacing(200), isTrue);
+
+      expect(const ExamPaperTypography(lineSpacingPercent: 10).isValid, isFalse);
+      final paper = buildSamplePaper(
+        typography: const ExamPaperTypography(lineSpacingPercent: 10),
+      );
+      expect(paper.issues, contains(ExamPaper.invalidLineSpacing));
+    });
+
+    test('round-trips the percentage through the saved profile', () {
+      const profile = ExamProfile(
+        typography: ExamPaperTypography(lineSpacingPercent: 80),
+      );
+      final restored = ExamProfile.fromJson(profile.toJson());
+      expect(restored.typography.lineSpacingPercent, 80);
+      // A corrupt or missing value falls back to the official spacing.
+      expect(
+        ExamProfile.fromJson(<String, dynamic>{'lineSpacingPercent': 5})
+            .typography
+            .lineSpacingPercent,
+        ExamPaperTypography.defaultLineSpacingPercent,
+      );
+      expect(
+        ExamProfile.fromJson(const <String, dynamic>{})
+            .typography
+            .lineSpacingPercent,
+        ExamPaperTypography.defaultLineSpacingPercent,
+      );
+    });
+
+    test('reports the spacing on its own when only it is invalid', () async {
+      final library = await ensureLibrary();
+      final state = ExamComposerState(
+        units: library.unitsOf('g1'),
+        drawings: library.drawings,
+        gradeLabel: examGradeLabel('الصف الأول المتوسط'),
+        now: DateTime(2025, 10, 1),
+      );
+      expect(state.issues, isNot(contains(ExamPaper.invalidLineSpacing)));
+      state.setLineSpacingPercent(10);
+      expect(state.typography, isNull);
+      expect(state.issues, contains(ExamPaper.invalidLineSpacing));
+      state.resetLineSpacing();
+      expect(state.typography, isNotNull);
+      expect(
+        state.typography!.lineSpacingPercent,
+        ExamPaperTypography.defaultLineSpacingPercent,
+      );
     });
   });
 

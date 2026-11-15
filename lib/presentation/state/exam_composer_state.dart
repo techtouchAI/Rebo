@@ -31,6 +31,7 @@ class ExamComposerState extends ChangeNotifier {
     headerFontSize = savedTypography.headerFontSize;
     bodyFontSize = savedTypography.bodyFontSize;
     headingFontSize = savedTypography.headingFontSize;
+    lineSpacingPercent = savedTypography.lineSpacingPercent;
     for (final QuestionKind kind in ExamTheoryQuestion.kinds) {
       _selected[kind] = <String>{};
       _instructions[kind] = defaultTheoryInstruction(kind, 0);
@@ -66,14 +67,19 @@ class ExamComposerState extends ChangeNotifier {
   int? bodyFontSize = ExamPaperTypography.defaultBodyFontSize;
   int? headingFontSize = ExamPaperTypography.defaultHeadingFontSize;
 
-  /// Null while one of the sizes is empty or out of range.
+  /// Line spacing as a percentage; 100 % keeps the official layout.
+  int? lineSpacingPercent = ExamPaperTypography.defaultLineSpacingPercent;
+
+  /// Null while one of the sizes or the spacing is empty or out of range.
   ExamPaperTypography? get typography {
     final header = headerFontSize;
     final body = bodyFontSize;
     final heading = headingFontSize;
+    final spacing = lineSpacingPercent;
     if (!ExamPaperTypography.isValidFontSize(header) ||
         !ExamPaperTypography.isValidFontSize(body) ||
-        !ExamPaperTypography.isValidFontSize(heading)) {
+        !ExamPaperTypography.isValidFontSize(heading) ||
+        !ExamPaperTypography.isValidLineSpacing(spacing)) {
       return null;
     }
     return ExamPaperTypography(
@@ -81,6 +87,7 @@ class ExamComposerState extends ChangeNotifier {
       headerFontSize: header!,
       bodyFontSize: body!,
       headingFontSize: heading!,
+      lineSpacingPercent: spacing!,
     );
   }
 
@@ -115,6 +122,19 @@ class ExamComposerState extends ChangeNotifier {
     headingFontSize = value;
     notifyListeners();
   }
+
+  void setLineSpacingPercent(int? value) {
+    if (lineSpacingPercent == value) {
+      return;
+    }
+    lineSpacingPercent = value;
+    notifyListeners();
+  }
+
+  /// Restores the official spacing with one tap; the slider calls this when the
+  /// teacher wants the source layout back.
+  void resetLineSpacing() =>
+      setLineSpacingPercent(ExamPaperTypography.defaultLineSpacingPercent);
 
   // ------------------------------------------------------------------ info ---
 
@@ -356,6 +376,15 @@ class ExamComposerState extends ChangeNotifier {
   List<String> get issues {
     final current = typography;
     if (current == null) {
+      // Report the spacing on its own so the bottom bar points at the field
+      // that is actually empty.
+      if (!ExamPaperTypography.isValidLineSpacing(lineSpacingPercent)) {
+        if (ExamPaperTypography.isValidFontSize(headerFontSize) &&
+            ExamPaperTypography.isValidFontSize(bodyFontSize) &&
+            ExamPaperTypography.isValidFontSize(headingFontSize)) {
+          return const <String>[ExamPaper.invalidLineSpacing];
+        }
+      }
       return const <String>[ExamPaper.invalidFontSizes];
     }
     return buildPaperWith(current).issues;

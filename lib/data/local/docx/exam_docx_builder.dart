@@ -33,7 +33,7 @@ abstract final class ExamDocxBuilder {
       'docProps/app.xml': utf8.encode(_applicationProperties),
       'word/document.xml': utf8.encode(documentXml(paper)),
       'word/_rels/document.xml.rels': utf8.encode(_documentRels),
-      'word/styles.xml': utf8.encode(_stylesXml(paper.typography.font)),
+      'word/styles.xml': utf8.encode(_stylesXml(paper.typography)),
       'word/settings.xml': utf8.encode(_settingsXml),
     };
     return buildStoredZip(parts);
@@ -117,8 +117,9 @@ abstract final class ExamDocxBuilder {
       '<w:compat/>'
       '</w:settings>';
 
-  static String _stylesXml(ExamPaperFont font) {
-    final family = _escapeXml(font.family);
+  static String _stylesXml(ExamPaperTypography typography) {
+    final family = _escapeXml(typography.font.family);
+    final line = typography.lineTwips;
     return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
         '<w:docDefaults><w:rPrDefault><w:rPr>'
@@ -127,7 +128,7 @@ abstract final class ExamDocxBuilder {
         '<w:lang w:val="ar-IQ" w:bidi="ar-IQ"/>'
         '</w:rPr></w:rPrDefault>'
         '<w:pPrDefault><w:pPr>'
-        '<w:spacing w:after="0" w:line="360" w:lineRule="auto"/>'
+        '<w:spacing w:after="0" w:line="$line" w:lineRule="auto"/>'
         '</w:pPr></w:pPrDefault></w:docDefaults>'
         '<w:style w:type="paragraph" w:default="1" w:styleId="Normal">'
         '<w:name w:val="Normal"/><w:qFormat/></w:style>'
@@ -211,15 +212,18 @@ class _DocumentWriter {
     bool center = false,
     bool keepNext = false,
     int after = 0,
-    int line = 360,
+    int? line,
   }) {
+    // A null line means "the spacing chosen for the paper"; the empty
+    // paragraphs that separate the questions always stay compact.
+    final spacing = line ?? typography.lineTwips;
     final buffer = StringBuffer('<w:p><w:pPr>');
     if (keepNext) {
       buffer.write('<w:keepNext/>');
     }
     buffer
       ..write('<w:bidi/>')
-      ..write('<w:spacing w:after="$after" w:line="$line" w:lineRule="auto"/>');
+      ..write('<w:spacing w:after="$after" w:line="$spacing" w:lineRule="auto"/>');
     if (center) {
       buffer.write('<w:jc w:val="center"/>');
     }

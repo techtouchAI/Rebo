@@ -157,6 +157,39 @@ void main() {
       final styles = utf8.decode(readStoredZip(bytes)['word/styles.xml']!);
       expect(styles, contains('w:cs="Amiri"'));
     });
+
+    test('keeps the official line spacing by default', () {
+      final bytes = ExamDocxBuilder.build(buildSamplePaper());
+      final document = documentXmlOf(bytes);
+      expect(document, contains('w:line="360" w:lineRule="auto"'));
+      final styles = utf8.decode(readStoredZip(bytes)['word/styles.xml']!);
+      expect(styles, contains('w:line="360" w:lineRule="auto"'));
+    });
+
+    test('writes the chosen line spacing into every text paragraph', () {
+      final paper = buildSamplePaper(
+        typography: const ExamPaperTypography(lineSpacingPercent: 60),
+      );
+      final bytes = ExamDocxBuilder.build(paper);
+      final document = documentXmlOf(bytes);
+      // 360 * 60 / 100 = 216 twips.
+      expect(document, contains('w:line="216" w:lineRule="auto"'));
+      expect(document, isNot(contains('w:line="360" w:lineRule="auto"')));
+      final styles = utf8.decode(readStoredZip(bytes)['word/styles.xml']!);
+      expect(styles, contains('w:line="216" w:lineRule="auto"'));
+      expectWellFormedXml(document);
+    });
+
+    test('keeps the blank separators compact whatever the spacing is', () {
+      final paper = buildSamplePaper(
+        typography: const ExamPaperTypography(lineSpacingPercent: 200),
+      );
+      final document = documentXmlOf(ExamDocxBuilder.build(paper));
+      // The blank paragraphs after each question stay at their fixed 240 even
+      // though the text paragraphs doubled.
+      expect(document, contains('w:line="720" w:lineRule="auto"'));
+      expect(document, contains('w:line="240" w:lineRule="auto"'));
+    });
   });
 
   group('safety', () {

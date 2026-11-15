@@ -18,6 +18,9 @@ class ExamComposerControllers {
         headerSize = TextEditingController(text: '${state.headerFontSize ?? ''}'),
         bodySize = TextEditingController(text: '${state.bodyFontSize ?? ''}'),
         headingSize = TextEditingController(text: '${state.headingFontSize ?? ''}'),
+        lineSpacing = TextEditingController(
+          text: '${state.lineSpacingPercent ?? ''}',
+        ),
         theoryDegree = TextEditingController(text: '${state.theoryDegree ?? ''}'),
         practicalDegree = TextEditingController(text: '${state.practicalDegree ?? ''}'),
         answerLines = TextEditingController(
@@ -45,6 +48,7 @@ class ExamComposerControllers {
   final TextEditingController headerSize;
   final TextEditingController bodySize;
   final TextEditingController headingSize;
+  final TextEditingController lineSpacing;
   final TextEditingController theoryDegree;
   final TextEditingController practicalDegree;
   final TextEditingController answerLines;
@@ -64,6 +68,7 @@ class ExamComposerControllers {
     headerSize.dispose();
     bodySize.dispose();
     headingSize.dispose();
+    lineSpacing.dispose();
     theoryDegree.dispose();
     practicalDegree.dispose();
     answerLines.dispose();

@@ -109,11 +109,25 @@ void main() {
     expect(find.text('نوع الخط وحجمه'), findsOneWidget);
   });
 
+  testWidgets('the home page shows the writer as its own section card',
+      (tester) async {
+    await pumpApplication(tester, size: const Size(1280, 1600));
+
+    expect(find.text('أقسام التطبيق'), findsOneWidget);
+    // A standalone card, not only the shortcut row below the grid.
+    expect(find.text('كتابة الأسئلة'), findsOneWidget);
+    expect(
+      find.text('اكتب ورقة امتحان وصدّرها ملف وورد مطابقاً للنموذج الرسمي'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('starts from the official sizes and the device academic year', (tester) async {
     await pumpComposer(tester);
     expect(fieldText(tester, 'exam-header-size'), '12');
     expect(fieldText(tester, 'exam-body-size'), '14');
     expect(fieldText(tester, 'exam-heading-size'), '16');
+    expect(fieldText(tester, 'exam-line-spacing'), '100');
 
     await tapKey(tester, 'exam-next');
     expect(fieldText(tester, 'exam-school'), isEmpty);
@@ -168,6 +182,58 @@ void main() {
     expect(key('exam-answer-lines'), findsOneWidget);
     await tapKey(tester, 'exam-theory-previous');
     expect(find.text('س2: الاختيارات'), findsOneWidget);
+  });
+
+  testWidgets('tightens the line spacing and restores the official one',
+      (tester) async {
+    final exports = <({Uint8List bytes, String name})>[];
+    final state = await pumpComposer(
+      tester,
+      exporter: (Uint8List bytes, String name) async {
+        exports.add((bytes: bytes, name: name));
+        return ExamExportResult(message: 'تم تجهيز الملف', path: '/tmp/$name', shared: true);
+      },
+    );
+
+    // The sample profile is the official one until the teacher changes it.
+    expect(key('exam-spacing-label'), findsOneWidget);
+    expect(tester.widget<Slider>(key('exam-line-spacing-slider')).value, 100);
+    // Restoring is pointless while the value is already the default.
+    expect(
+      tester.widget<TextButton>(key('exam-line-spacing-reset')).onPressed,
+      isNull,
+    );
+
+    await tester.enterText(key('exam-line-spacing'), '70');
+    await tester.pump();
+    expect(find.textContaining('٧٠٪'), findsOneWidget);
+    expect(tester.widget<Slider>(key('exam-line-spacing-slider')).value, 70);
+    expect(
+      tester.widget<TextButton>(key('exam-line-spacing-reset')).onPressed,
+      isNotNull,
+    );
+
+    // Out-of-range input is refused instead of silently exported.
+    await tester.enterText(key('exam-line-spacing'), '10');
+    await tester.pump();
+    expect(find.textContaining('أدخل نسبة بين'), findsOneWidget);
+
+    await tapKey(tester, 'exam-line-spacing-reset');
+    expect(fieldText(tester, 'exam-line-spacing'), '100');
+    expect(tester.widget<Slider>(key('exam-line-spacing-slider')).value, 100);
+
+    // 70 % must reach the exported document: 360 * 0.7 = 252 twips.
+    await tester.enterText(key('exam-line-spacing'), '70');
+    await tester.pump();
+    await fillMinimumPaper(tester, state);
+    await tapKey(tester, 'exam-export');
+    await tester.pumpAndSettle();
+
+    expect(exports, hasLength(1));
+    final xml = documentXmlOf(exports.single.bytes);
+    expect(xml, contains('w:line="252" w:lineRule="auto"'));
+    expect(xml, isNot(contains('w:line="360" w:lineRule="auto"')));
+    expectWellFormedXml(xml);
   });
 
   testWidgets('writes a full paper and exports it as a Word file', (tester) async {
