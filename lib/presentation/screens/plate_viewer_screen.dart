@@ -68,11 +68,6 @@ class PlateViewerScreen extends StatelessWidget {
                     selected.caption,
                     style: theme.textTheme.titleMedium?.copyWith(color: Colors.white),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    selected.source,
-                    style: theme.textTheme.labelMedium?.copyWith(color: Colors.white70),
-                  ),
                   if (unit != null) ...<Widget>[
                     const SizedBox(height: AppSpacing.sm),
                     OutlinedButton.icon(

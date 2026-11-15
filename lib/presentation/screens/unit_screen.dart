@@ -13,6 +13,7 @@ import '../../domain/models/library.dart';
 import '../navigation/app_routes.dart';
 import '../state/app_state.dart';
 import '../widgets/illustration_figure.dart';
+import '../widgets/unit_switcher_bar.dart';
 import '../widgets/units/unit_sections.dart';
 import '../widgets/text_scale_controls.dart';
 
@@ -87,9 +88,29 @@ class _UnitScreenState extends State<UnitScreen> {
         .whereType<GlossaryTerm>()
         .toList(growable: false);
 
+    final siblings = unit.isStandalone
+        ? const <LearningUnit>[]
+        : state.library.unitsOf(unit.sectionId);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(unit.displayTitle, style: theme.textTheme.titleLarge),
+        bottom: siblings.length > 1
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(56),
+                child: UnitSwitcherBar(
+                  units: siblings,
+                  current: unit,
+                  accent: accent,
+                  onSelected: (LearningUnit target) {
+                    if (target.id == unit.id) {
+                      return;
+                    }
+                    _openSibling(target);
+                  },
+                ),
+              )
+            : null,
         actions: <Widget>[
           IconButton(
             tooltip: isFavorite ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة',
@@ -159,7 +180,7 @@ class _UnitScreenState extends State<UnitScreen> {
                   if (unit.plate != null) ...<Widget>[
                     const SizedBox(height: AppSpacing.xl),
                     SectionHeader(
-                      title: 'لوحة من دليل المعلم',
+                      title: 'لوحة الوحدة',
                       accent: AppColors.ochre,
                     ),
                     _PlateCard(unit: unit),
@@ -168,7 +189,7 @@ class _UnitScreenState extends State<UnitScreen> {
                     const SizedBox(height: AppSpacing.xl),
                     SectionHeader(
                       title: 'مصطلحات الوحدة',
-                      subtitle: 'تعريفات كما وردت في المصدر',
+                      subtitle: 'مصطلحات مرتبطة بموضوعات الوحدة',
                       accent: colorsSecondary(context),
                     ),
                     EqualColumnsGrid(
@@ -185,14 +206,31 @@ class _UnitScreenState extends State<UnitScreen> {
                     const SizedBox(height: AppSpacing.xl),
                     _QuizCallToAction(unit: unit, state: state, accent: accent),
                   ],
-                  const SizedBox(height: AppSpacing.xl),
-                  _PrevNextBar(previous: previous, next: next),
+                  if (position >= 0) ...<Widget>[
+                    const SizedBox(height: AppSpacing.xl),
+                    _PrevNextBar(previous: previous, next: next),
+                  ],
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// Switches to another unit of the same grade without piling up screens.
+  void _openSibling(LearningUnit unit) {
+    if (unit.id == widget.unitId) {
+      return;
+    }
+    final controller = _controller;
+    final state = _state;
+    if (controller != null && state != null && controller.hasClients) {
+      state.saveScrollOffset(widget.unitId, controller.offset);
+    }
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (BuildContext context) => UnitScreen(unitId: unit.id)),
     );
   }
 
@@ -290,12 +328,12 @@ class _UnitHeader extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            unit.isIntroduction ? unit.title : '${unit.numberLabel}: ${unit.displayTitle}',
+            unit.isStandalone ? unit.title : '${unit.numberLabel}: ${unit.displayTitle}',
             style: theme.textTheme.displayMedium?.copyWith(fontSize: 30),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            unit.summary,
+            unit.intro.isNotEmpty ? unit.intro : unit.summary,
             style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15.5, color: scheme.onSurfaceVariant),
           ),
         ],
@@ -384,15 +422,19 @@ class _PlateCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              AspectRatio(
-                aspectRatio: 16 / 10,
-                child: Image.asset(
-                  plate.asset,
-                  fit: BoxFit.cover,
-                  errorBuilder: (BuildContext context, Object error, StackTrace? stack) => Container(
-                    color: scheme.surfaceContainerHighest,
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.broken_image_outlined),
+              SizedBox(
+                height: 240,
+                child: ColoredBox(
+                  color: scheme.surfaceContainerHighest,
+                  child: Image.asset(
+                    plate.asset,
+                    fit: BoxFit.contain,
+                    errorBuilder: (
+                      BuildContext context,
+                      Object error,
+                      StackTrace? stack,
+                    ) =>
+                        const Center(child: Icon(Icons.broken_image_outlined)),
                   ),
                 ),
               ),
@@ -402,8 +444,6 @@ class _PlateCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(plate.caption, style: theme.textTheme.titleMedium),
-                    const SizedBox(height: 2),
-                    Text(plate.source, style: theme.textTheme.labelMedium),
                   ],
                 ),
               ),
@@ -444,7 +484,7 @@ class _QuizCallToAction extends StatelessWidget {
                 Text('اختبر فهمك', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 2),
                 Text(
-                  '${toArabicDigits('${unit.questions.length}')} سؤالاً من أسئلة الوحدة في المصدر'
+                  '${toArabicDigits('${unit.questions.length}')} سؤالاً على موضوعات الوحدة'
                   '${score == null ? '' : ' — أفضل نتيجة: ${toArabicDigits('$score')}'}',
                   style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13),
                 ),

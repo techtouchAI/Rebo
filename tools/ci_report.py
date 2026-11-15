@@ -37,7 +37,7 @@ def detail(text: str) -> str:
     index = flat.find(marker)
     if index >= 0:
         return flat[index:index + 600]
-    return flat[:700]
+    return flat[:1200]
 
 
 def emit(level: str, message: str) -> None:
@@ -110,11 +110,13 @@ def report_test(path: Path, status: int = 0) -> int:
         elif kind == "error":
             name = names.get(event.get("testID", -1)) or names.get(current) or "unrelated error"
             message = " ".join(str(event.get("error", "")).split())
-            trace = str(event.get("stackTrace", "")).splitlines()
+            trace = [line.strip() for line in str(event.get("stackTrace", "")).splitlines() if line.strip()]
             if message:
-                errors.append((name, message[:500]))
-            if trace:
-                errors.append((name, " at " + trace[0].strip()[:300]))
+                # Keep the whole expectation text: it carries the actual/expected
+                # values that make the failure diagnosable from the annotation.
+                errors.append((name, message[:1800]))
+            for line in trace[:3]:
+                errors.append((name, " at " + line[:300]))
 
     for test_id in failing:
         name = names.get(test_id, "unnamed test")
@@ -131,7 +133,10 @@ def report_test(path: Path, status: int = 0) -> int:
         emitted.add(key)
         if len(emitted) > MAX_ANNOTATIONS:
             break
-        emit("error", f"{name} :: {detail(message)}")
+        if message.startswith(" at "):
+            emit("error", f"{name} ::{message}")
+        else:
+            emit("error", f"{name} :: {detail(message)}")
 
     plain = [line.strip() for line in lines if line.strip() and not line.strip().startswith("{")]
     widget_hits = [
@@ -145,9 +150,22 @@ def report_test(path: Path, status: int = 0) -> int:
         emit("error", line)
 
     print(f"## tests: {total} finished, {len(failing)} failing")
-    if status != 0 and not widget_hits:
-        raw_tail = " | ".join(plain[-16:])
-        emit("error", f"flutter test exited with {status}; last output: {raw_tail}")
+    if status != 0:
+        # The JSON reporter keeps the human readable exception text on the plain
+        # lines; annotate them in chunks so the whole trace survives.
+        chunk: list[str] = []
+        chunks: list[str] = []
+        for line in plain:
+            chunk.append(line)
+            if sum(len(item) + 1 for item in chunk) > 700:
+                chunks.append(" | ".join(chunk))
+                chunk = []
+        if chunk:
+            chunks.append(" | ".join(chunk))
+        for body in chunks[-10:]:
+            emit("error", f"flutter test output: {body}")
+        if not chunks:
+            emit("error", f"flutter test exited with {status} but produced no readable output")
     return 0
 
 
@@ -164,12 +182,23 @@ ERROR_HINTS = (
 )
 
 
+SUCCESS_HINTS = (
+    "verification passed",
+    "all checks passed",
+    "build succeeded",
+    "built successfully",
+)
+
+
 def report_log(path: Path) -> int:
     """Annotates the first error-looking lines of an arbitrary build log."""
     if not path.exists():
         emit("error", f"build log missing: {path}")
         return 0
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    if any(hint in line.lower() for line in lines for hint in SUCCESS_HINTS):
+        print(f"## build log: success, {len(lines)} lines")
+        return 0
     matched: list[str] = []
     for index, raw in enumerate(lines):
         line = raw.strip()

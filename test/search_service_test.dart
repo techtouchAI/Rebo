@@ -14,7 +14,7 @@ void main() {
   });
 
   test('the index covers units, lessons, terms and plates', () {
-    expect(search.indexSize, greaterThanOrEqualTo(51));
+    expect(search.indexSize, greaterThanOrEqualTo(50));
   });
 
   test('finds units by a curriculum term', () {
@@ -45,11 +45,15 @@ void main() {
     expect(search.search('الزخرفة', limit: 2).length, 2);
   });
 
-  test('finds glossary terms and plates', () {
+  test('finds glossary terms and the theatre section', () {
     final terms = search.search('التكرار');
     expect(terms.any((hit) => hit.type == SearchHitType.term), isTrue);
-    final plates = search.search('الأنشطة المسرحية');
-    expect(plates.any((hit) => hit.type == SearchHitType.plate), isTrue);
+    final theatre = search.search('الأنشطة المسرحية');
+    expect(
+      theatre.any((hit) => hit.type == SearchHitType.unit && hit.title.contains('المسرحية')),
+      isTrue,
+    );
+    expect(theatre.any((hit) => hit.type == SearchHitType.plate), isFalse);
   });
 
   test('empty queries return nothing', () {

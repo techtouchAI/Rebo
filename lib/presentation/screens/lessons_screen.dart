@@ -8,7 +8,7 @@ import '../navigation/app_routes.dart';
 import '../state/app_state.dart';
 import '../widgets/text_scale_controls.dart';
 
-/// Index of the practical lesson plans (theory + practice for each topic).
+/// Index of the practical lessons.
 class LessonsScreen extends StatelessWidget {
   const LessonsScreen({super.key});
 
@@ -32,8 +32,8 @@ class LessonsScreen extends StatelessWidget {
               children: <Widget>[
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  'خطط الدروس الأسبوعية كما وردت في ملفات المنهج: الأهداف العامة والخاصة، '
-                  'الوسائل التعليمية، المقدمة، العرض، والواجب البيتي — لكل درس حصة نظرية وأخرى عملية.',
+                  'دروس تطبيقية في الظل والضوء والمنظور والزخرفة وتصميم غلاف الكتاب: '
+                  'محتوى كل درس مع واجبه البيتي.',
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: AppSpacing.lg),
@@ -78,13 +78,19 @@ class LessonsScreen extends StatelessWidget {
                               Wrap(
                                 spacing: AppSpacing.sm,
                                 runSpacing: AppSpacing.sm,
-                                children: lesson.plans
-                                    .map((LessonSession plan) => MetaPill(
-                                          label: plan.label,
-                                          icon: plan.isTheory ? Icons.menu_book_outlined : Icons.brush_outlined,
-                                          color: plan.isTheory ? scheme.secondary : scheme.tertiary,
-                                        ))
-                                    .toList(growable: false),
+                                children: <Widget>[
+                                  MetaPill(
+                                    label: lesson.plans.isEmpty ? 'درس تطبيقي' : lesson.plans.first.label,
+                                    icon: Icons.menu_book_outlined,
+                                    color: scheme.secondary,
+                                  ),
+                                  if (lesson.plans.isNotEmpty && lesson.plans.first.homework.isNotEmpty)
+                                    MetaPill(
+                                      label: 'واجب بيتي',
+                                      icon: Icons.home_work_outlined,
+                                      color: scheme.tertiary,
+                                    ),
+                                ],
                               ),
                             ],
                           ),

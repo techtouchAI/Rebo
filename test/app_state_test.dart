@@ -71,6 +71,16 @@ void main() {
     expect(state.quizScoreOf('g1-u1'), 6);
   });
 
+  test('the chosen font is persisted and restored', () async {
+    final repository = MemoryProgressRepository();
+    final state = buildState(library: library, repository: repository);
+    expect(state.font, AppFont.almarai);
+    await state.setFont(AppFont.cairo);
+    expect(repository.lastSaved?.font, AppFont.cairo);
+    expect(ReadingProgress.fromJson(repository.lastSaved!.toJson()).font, AppFont.cairo);
+    expect(AppFont.values.length, greaterThanOrEqualTo(4));
+  });
+
   test('text scale is clamped and theme mode is persisted', () async {
     final repository = MemoryProgressRepository();
     final state = buildState(library: library, repository: repository);
@@ -97,6 +107,7 @@ void main() {
     expect(state.visibleUnitIds, isNot(contains('g1-u1')));
     expect(state.totalUnits, 4);
     expect(state.visiblePlates.any((Plate plate) => plate.unitId.startsWith('g1')), isFalse);
+    expect(state.theatreUnit, isNotNull);
     expect(state.visibleGlossary.any((GlossaryTerm term) => term.unitId.startsWith('g1')), isFalse);
     expect(
       state.search.search('المنظور').where((hit) => hit.type == SearchHitType.unit),
@@ -112,12 +123,17 @@ void main() {
     expect(repository.lastSaved?.gradeId, isNull);
   });
 
-  test('resetting the reading data keeps the chosen grade', () async {
-    final state = buildState(library: library, progress: ReadingProgress(gradeId: 'g3'));
+  test('resetting the reading data keeps the chosen grade and look', () async {
+    final state = buildState(
+      library: library,
+      progress: ReadingProgress(gradeId: 'g3', font: AppFont.tajawal, textScale: 1.2),
+    );
     await state.markRead('g3-u1');
     await state.resetProgress();
     expect(state.readUnitsCount, 0);
     expect(state.gradeId, 'g3');
+    expect(state.font, AppFont.tajawal);
+    expect(state.textScale, 1.2);
   });
 
   test('section progress counts only the units of that grade', () async {

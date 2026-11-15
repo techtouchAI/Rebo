@@ -151,7 +151,7 @@ class _ProgressPanel extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: () => AppRoutes.openPlates(context),
             icon: const Icon(Icons.image_outlined, size: 18),
-            label: const Text('لوحات الدليل'),
+            label: const Text('اللوحات'),
           ),
         ],
       ),
@@ -224,7 +224,7 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final units = state.visibleUnits.where((LearningUnit unit) => !unit.isIntroduction).toList(growable: false);
+    final units = state.visibleUnits;
     final totalTopics = units.fold<int>(0, (int sum, LearningUnit unit) => sum + unit.topics.length);
     final totalQuestions = units.fold<int>(0, (int sum, LearningUnit unit) => sum + unit.questions.length);
     // One-word labels: the four tiles always share a single row.
@@ -342,6 +342,7 @@ class _SectionCard extends StatelessWidget {
     final count = switch (section.kind) {
       'lessons' => state.library.lessons.length,
       'plates' => state.visiblePlates.length,
+      'theatre' => state.theatreUnit?.topics.length ?? 0,
       _ => state.library.unitsOf(section.id).length,
     };
     final progress = section.isGrade ? state.sectionProgress(section.id) : null;
@@ -374,7 +375,12 @@ class _SectionCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    '${toArabicDigits('$count')} ${section.kind == 'lessons' ? 'دروس' : section.kind == 'plates' ? 'لوحة' : 'وحدات'}',
+                    '${toArabicDigits('$count')} ${switch (section.kind) {
+                      'lessons' => 'دروس',
+                      'plates' => 'لوحة',
+                      'theatre' => 'موضوعات',
+                      _ => 'وحدات',
+                    }}',
                     style: theme.textTheme.labelMedium,
                   ),
                 ],
@@ -410,6 +416,12 @@ class _SectionCard extends StatelessWidget {
       case 'plates':
         AppRoutes.openPlates(context);
         break;
+      case 'theatre':
+        final theatre = state.theatreUnit;
+        if (theatre != null) {
+          AppRoutes.openUnit(context, theatre);
+        }
+        break;
       default:
         final units = state.library.unitsOf(section.id);
         if (units.isNotEmpty) {
@@ -422,6 +434,8 @@ class _SectionCard extends StatelessWidget {
     switch (kind) {
       case 'intro':
         return Icons.auto_stories_outlined;
+      case 'theatre':
+        return Icons.theater_comedy_outlined;
       case 'lessons':
         return Icons.edit_note_outlined;
       case 'plates':
@@ -489,9 +503,8 @@ class _FooterNote extends StatelessWidget {
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
-              'المحتوى مستخرج من ملف «ملخص التربية الفنية» وخطط الدروس ولوحات دليل معلم '
-              'التربية الفنية للمرحلة المتوسطة. يعمل التطبيق offline بالكامل، ولا يحتاج إلى اتصال '
-              'بالإنترنت بعد التثبيت.',
+              'وحدات التربية الفنية للمرحلة المتوسطة ودروسها التطبيقية ولوحاتها ومفردات '
+              'الأنشطة المسرحية. يعمل التطبيق دون اتصال بالإنترنت بالكامل بعد التثبيت.',
               style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13),
             ),
           ),

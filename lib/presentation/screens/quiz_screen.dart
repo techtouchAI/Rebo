@@ -52,7 +52,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 Text(unit.title, style: theme.textTheme.headlineLarge),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'أسئلة الوحدة كما وردت في ملخص التربية الفنية. الأسئلة الموضوعية تُصحّح تلقائياً، '
+                  'أسئلة على موضوعات الوحدة. الأسئلة الموضوعية تُصحّح تلقائياً، '
                   'وأسئلة التعداد تُكشف إجاباتها بعد المحاولة.',
                   style: theme.textTheme.bodyMedium,
                 ),
@@ -266,7 +266,7 @@ class _QuestionCard extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: AppSpacing.xs),
                     child: Text(
-                      'لم يذكر ملخص الوحدة الإجابة صراحةً؛ يُترك السؤال للمناقشة داخل الصف.',
+                      'لا توجد إجابة محددة لهذا السؤال؛ يُترك للمناقشة داخل الصف.',
                       style: theme.textTheme.labelMedium,
                     ),
                   ),

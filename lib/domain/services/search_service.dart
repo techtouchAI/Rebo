@@ -59,7 +59,7 @@ class SearchService {
         type: SearchHitType.unit,
         id: unit.id,
         title: unit.displayTitle,
-        subtitle: unit.isIntroduction ? 'مدخل' : unit.grade,
+        subtitle: unit.isIntroduction ? 'مدخل' : unit.isTheatre ? 'قسم مخصص' : unit.grade,
         haystack: normalizeArabic(unit.searchableText),
         text: unit.searchableText,
       ));

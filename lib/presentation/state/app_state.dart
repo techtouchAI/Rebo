@@ -23,8 +23,15 @@ class AppState extends ChangeNotifier {
     );
   }
 
+  /// Units the search may index for one grade: the grade's own units plus the
+  /// shared sections that every grade sees (the introduction and the theatre
+  /// themes).
   static Set<String> _unitIdsOf(Library library, String gradeId) {
-    return library.unitsOf(gradeId).map((LearningUnit unit) => unit.id).toSet();
+    return <String>{
+      for (final LearningUnit unit in library.unitsOf(gradeId)) unit.id,
+      for (final LearningUnit unit in library.units)
+        if (unit.isIntroduction || unit.isTheatre) unit.id,
+    };
   }
 
   final Library library;
@@ -77,6 +84,20 @@ class AppState extends ChangeNotifier {
     await _persist();
   }
 
+  // ----------------------------------------------------------------- font ---
+
+  /// Typeface of the body text, chosen in the settings page.
+  AppFont get font => _progress.font;
+
+  Future<void> setFont(AppFont font) async {
+    if (_progress.font == font) {
+      return;
+    }
+    _progress.font = font;
+    notifyListeners();
+    await _persist();
+  }
+
   static const double MinTextScale = 0.5;
   static const double MaxTextScale = 1.2;
 
@@ -123,6 +144,16 @@ class AppState extends ChangeNotifier {
     return library.unitsOf(id);
   }
 
+  /// The shared sections that are not part of any grade.
+  LearningUnit? get theatreUnit {
+    for (final unit in library.units) {
+      if (unit.isTheatre) {
+        return unit;
+      }
+    }
+    return null;
+  }
+
   /// Ids of every unit the learner may open: the chosen grade plus the shared
   /// introduction that the home and index pages keep visible.
   Set<String> get visibleUnitIds {
@@ -152,7 +183,9 @@ class AppState extends ChangeNotifier {
     final result = <ContentSection>[
       ...library.sections.where((item) => item.kind == 'intro'),
       if (section != null) section,
-      ...library.sections.where((item) => item.kind == 'lessons' || item.kind == 'plates'),
+      ...library.sections.where(
+        (item) => item.kind == 'lessons' || item.kind == 'theatre' || item.kind == 'plates',
+      ),
     ];
     return result;
   }
@@ -172,15 +205,9 @@ class AppState extends ChangeNotifier {
     if (id == null) {
       return library.plates;
     }
-    // Plates belong to grade units; the shared appendix plates (not tied to a
-    // grade unit) stay available for every grade.
-    final gradeUnitIds = library.units
-        .where((LearningUnit unit) => !unit.isIntroduction)
-        .map((LearningUnit unit) => unit.id)
-        .toSet();
     final visible = visibleUnitIds;
     return library.plates
-        .where((plate) => visible.contains(plate.unitId) || !gradeUnitIds.contains(plate.unitId))
+        .where((plate) => visible.contains(plate.unitId))
         .toList(growable: false);
   }
 
@@ -306,9 +333,15 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> resetProgress() async {
-    // The chosen grade is a display setting, not reading data: keep it so the
-    // learner is not pushed back to the picker.
-    _progress = ReadingProgress(gradeId: _progress.gradeId);
+    // The chosen grade, the theme and the font are display settings, not
+    // reading data: keep them so the reader is not pushed back to the picker
+    // or to a different look.
+    _progress = ReadingProgress(
+      gradeId: _progress.gradeId,
+      themeMode: _progress.themeMode,
+      textScale: _progress.textScale,
+      font: _progress.font,
+    );
     notifyListeners();
     await _persist();
   }
@@ -331,9 +364,7 @@ class AppState extends ChangeNotifier {
       }
       buffer.writeln();
     }
-    buffer
-      ..writeln('من تطبيق مِرسم — التربية الفنية للمرحلة المتوسطة.')
-      ..writeln('المصدر: ملخص التربية الفنية (دليل معلم التربية الفنية للمرحلة المتوسطة).');
+    buffer.writeln('من تطبيق مِرسم — التربية الفنية للمرحلة المتوسطة.');
     return buffer.toString();
   }
 }

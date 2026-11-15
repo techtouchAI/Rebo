@@ -38,6 +38,12 @@ from contentlib import (  # noqa: E402
     parse_topics,
     polish,
 )
+from theatre_content import (  # noqa: E402
+    THEATRE_INTRO,
+    THEATRE_SUBTITLE,
+    THEATRE_TITLE,
+    THEATRE_TOPICS,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTENT_DIR = ROOT / "assets" / "content"
@@ -571,17 +577,6 @@ def _is_teacher_centred(title: str) -> bool:
 
 # ----------------------------------------------------------------- lessons ---
 
-LESSON_FILES = [
-    ("الظل والضوء", "theory", "الظل والضوء.docx"),
-    ("الظل والضوء", "practice", "الظل والضوء العملي.docx"),
-    ("المنظور", "theory", "المنظور.docx"),
-    ("المنظور", "practice", "المنظور العملي.docx"),
-    ("الزخرفة", "theory", "الرخرفة.docx"),
-    ("الزخرفة", "practice", "الزخرفة عملي.docx"),
-    ("تصميم غلاف كتاب", "theory", "تصميم غلاف كتاب.docx"),
-    ("تصميم غلاف كتاب", "practice", "تصميم غلاف كتاب عملي.docx"),
-]
-
 LESSON_META = {
     "الظل والضوء": {
         "summary": "مصادر الضوء، والضوء المباشر والمنعكس، والظل الحقيقي والساقط، والأجسام المعتمة والشفافة ونصف الشفافة.",
@@ -644,6 +639,18 @@ _LABELS = {
 _BULLET_MARKERS = ("*", "-", "•", "–")
 
 
+# The practical lessons are read as a single session per topic: the weekly-plan
+# rows (general/specific objectives, teaching aids, introduction) and the extra
+# practical session are no longer part of the app. The presentation and the
+# home assignment stay as the content of the theory lesson.
+LESSON_FILES = [
+    ("الظل والضوء", "theory", "الظل والضوء.docx"),
+    ("المنظور", "theory", "المنظور.docx"),
+    ("الزخرفة", "theory", "الرخرفة.docx"),
+    ("تصميم غلاف كتاب", "theory", "تصميم غلاف كتاب.docx"),
+]
+
+
 def build_lessons() -> List[dict]:
     grouped: Dict[str, dict] = {}
     for title, kind, filename in LESSON_FILES:
@@ -653,7 +660,7 @@ def build_lessons() -> List[dict]:
         document = docx.Document(str(path))
         plan = _read_plan(document)
         plan["kind"] = kind
-        plan["label"] = "الحصة النظرية" if kind == "theory" else "الحصة العملية"
+        plan["label"] = "الدرس"
         lesson = grouped.setdefault(title, {
             "id": "lesson-" + slug(title),
             "title": title,
@@ -668,19 +675,14 @@ def build_lessons() -> List[dict]:
     for i, title in enumerate(["الظل والضوء", "المنظور", "الزخرفة", "تصميم غلاف كتاب"], start=1):
         lesson = grouped[title]
         lesson["order"] = i
-        lesson["plans"].sort(key=lambda plan: 0 if plan["kind"] == "theory" else 1)
         lessons.append(lesson)
     return lessons
 
 
 def _read_plan(document) -> dict:
-    """Turn a weekly-plan table into a structured lesson plan."""
+    """Keep the presentation and the home assignment of a lesson document."""
     plan: dict = {
         "subject": "",
-        "generalAims": "",
-        "specificAims": [],
-        "media": "",
-        "introduction": "",
         "body": [],
         "homework": [],
     }
@@ -709,18 +711,6 @@ def _read_plan(document) -> dict:
             blocks = _blocks(value)
             if label == "subject":
                 plan["subject"] = _reflow(value)
-            elif label == "generalAims":
-                plan["generalAims"] = _reflow(value)
-            elif label == "specificAims":
-                aims = []
-                for block in blocks:
-                    text = re.sub(r"^[0-9]+[)-]\s*", "", block["text"])
-                    aims.append(text)
-                plan["specificAims"] = aims
-            elif label == "media":
-                plan["media"] = _reflow(value)
-            elif label == "introduction":
-                plan["introduction"] = _reflow(value)
             elif label == "conclusion":
                 plan["body"].append({"kind": "heading", "text": "الخاتمة"})
                 plan["body"].extend(blocks)
@@ -801,32 +791,106 @@ PLATE_FILES = [
     ("17", "الصف الثالث المتوسط", "الوحدة الثانية: التصميم والزخرفة", "g3-u2"),
     ("18", "الصف الثالث المتوسط", "الوحدة الثالثة: التشكيل المجسم", "g3-u3"),
     ("19", "الصف الثالث المتوسط", "الوحدة الرابعة: التذوق وتاريخ الفن", "g3-u4"),
-    ("20", "المرحلة المتوسطة", "مفردات الأنشطة المسرحية", "theatre"),
 ]
 
+# Minimum vertical share of a scan that must contain ink for the band to count
+# as an artwork rather than as white paper between two artworks.
+_ARTWORK_INK = 0.25
+_MIN_BAND = 0.12
 
-def crop_plate(source: Path, target: Path, max_width: int = 1600) -> None:
-    image = Image.open(source).convert("RGB")
+
+def split_artwork_bands(image: "Image.Image") -> List[tuple]:
+    """Vertical bands of a scanned page that actually hold an artwork.
+
+    Several pages mount two artworks with a large white gap between them; a
+    plain bounding box would keep that gap and show the plate as mostly white
+    (the cards then look empty). Every band of ink is returned separately, top
+    to bottom, so each artwork gets its own faithful crop.
+    """
     gray = image.convert("L")
-    # The scans are mounted on a white page: keep only the artwork.
+    width, height = gray.size
+    step = max(1, height // 900)
+    rows: List[bool] = []
+    for y in range(0, height, step):
+        ink = 0
+        for x in range(0, width, max(1, width // 60)):
+            if gray.getpixel((x, y)) < 236:
+                ink += 1
+        rows.append(ink >= max(1, (width // max(1, width // 60)) // 12))
+    bands: List[tuple] = []
+    start = None
+    for index, filled in enumerate(rows):
+        if filled and start is None:
+            start = index
+        elif not filled and start is not None:
+            bands.append((start, index))
+            start = None
+    if start is not None:
+        bands.append((start, len(rows)))
+    # Bridge small gaps (a line of text above the artwork) and keep real bands.
+    merged: List[List[int]] = []
+    for begin, end in bands:
+        if merged and (begin - merged[-1][1]) <= max(3, int(len(rows) * 0.02)):
+            merged[-1][1] = end
+        else:
+            merged.append([begin, end])
+    total = len(rows) or 1
+    keep = [band for band in merged if (band[1] - band[0]) / total >= _MIN_BAND]
+    if not keep:
+        keep = merged or [[0, total]]
+    return [(int(begin * step), min(height, int(end * step))) for begin, end in keep]
+
+
+def crop_artwork(image: "Image.Image", top: int, bottom: int) -> "Image.Image":
+    width = image.width
+    band = image.crop((0, top, width, bottom))
+    gray = band.convert("L")
     mask = gray.point(lambda value: 0 if value > 244 else 255)
     box = mask.getbbox()
     if box:
-        left, top, right, bottom = box
-        pad_x = int((right - left) * 0.04)
-        pad_y = int((bottom - top) * 0.04)
-        box = (
+        left, upper, right, lower = box
+        pad_x = int((right - left) * 0.02)
+        pad_y = int((lower - upper) * 0.02)
+        band = band.crop((
             max(0, left - pad_x),
-            max(0, top - pad_y),
-            min(image.width, right + pad_x),
-            min(image.height, bottom + pad_y),
-        )
-        image = image.crop(box)
-    if image.width > max_width:
-        ratio = max_width / image.width
-        image = image.resize((max_width, int(image.height * ratio)), Image.LANCZOS)
+            max(0, upper - pad_y),
+            min(band.width, right + pad_x),
+            min(band.height, lower + pad_y),
+        ))
+    return band
+
+
+def crop_plate(source: Path, target: Path, max_width: int = 1600) -> None:
+    """Write the artwork of a scanned page as one compact JPEG."""
+    image = Image.open(source).convert("RGB")
+    bands = split_artwork_bands(image)
+    pieces = [crop_artwork(image, top, bottom) for top, bottom in bands]
+    if len(pieces) > 1:
+        # Drop stray marks (a small decorative graphic) that share the page
+        # with the real artwork: an artwork covers most of the page width.
+        widest = max(piece.width for piece in pieces)
+        tallest = max(piece.height for piece in pieces)
+        pieces = [
+            piece
+            for piece in pieces
+            if piece.width >= widest * 0.45 and piece.height >= tallest * 0.2
+        ] or pieces
+    if len(pieces) == 1:
+        artwork = pieces[0]
+    else:
+        gap = max(12, int(image.height * 0.02))
+        width = max(piece.width for piece in pieces)
+        height = sum(piece.height for piece in pieces) + gap * (len(pieces) - 1)
+        artwork = Image.new("RGB", (width, height), (255, 255, 255))
+        offset = 0
+        for piece in pieces:
+            artwork.paste(piece, ((width - piece.width) // 2, offset))
+            offset += piece.height + gap
+    if artwork.width > max_width:
+        ratio = max_width / artwork.width
+        artwork = artwork.resize((max_width, int(artwork.height * ratio)), Image.LANCZOS)
     target.parent.mkdir(parents=True, exist_ok=True)
-    image.save(target, "JPEG", quality=88, optimize=True, progressive=True)
+    artwork.save(target, "JPEG", quality=88, optimize=True, progressive=True)
 
 
 def build_plates() -> List[dict]:
@@ -839,13 +903,10 @@ def build_plates() -> List[dict]:
         document = docx.Document(str(source))
         paragraphs = [polish(p.text) for p in document.paragraphs if p.text.strip()]
         caption = unit_title
-        page_source = ""
         for text in paragraphs:
-            if text.startswith("المصدر:"):
-                page_source = text
-            elif text.startswith("لوحة توضيحية"):
+            if text.startswith("المصدر:") or text.startswith("لوحة توضيحية"):
                 continue
-            elif paragraph_looks_like_caption(text):
+            if paragraph_looks_like_caption(text):
                 caption = text
         image_name = f"plate-{prefix}.jpg"
         with_zip_image(source, ROOT / "build_tmp_plate.jpg")
@@ -856,11 +917,42 @@ def build_plates() -> List[dict]:
             "asset": f"assets/images/plates/{image_name}",
             "title": unit_title,
             "caption": caption,
-            "source": page_source,
             "grade": grade,
             "unitId": unit_id,
         })
     return plates
+
+
+# --------------------------------------------------------------- theatre ---
+
+
+def build_theatre() -> dict:
+    topics = []
+    for index, topic in enumerate(THEATRE_TOPICS, start=1):
+        topics.append({
+            "id": f"t{index}",
+            "title": topic["title"],
+            "bullets": list(topic["bullets"]),
+            "listTitle": None,
+            "listItems": [],
+        })
+    return {
+        "id": "theatre",
+        "sectionId": "theatre",
+        "order": 1,
+        "title": THEATRE_TITLE,
+        "displayTitle": THEATRE_TITLE,
+        "grade": "المرحلة المتوسطة",
+        "template": "concept",
+        "accent": "primary",
+        "figures": [],
+        "topics": topics,
+        "questions": [],
+        "intro": THEATRE_INTRO,
+        "unitText": "\n".join(
+            [THEATRE_INTRO] + [topic["title"] + "\n" + "\n".join(topic["bullets"]) for topic in topics]
+        ),
+    }
 
 
 def paragraph_looks_like_caption(text: str) -> bool:
@@ -943,6 +1035,7 @@ def write_json(path: Path, payload) -> None:
 def main() -> None:
     units = build_units()
     intro = build_intro()
+    theatre = build_theatre()
     lessons = build_lessons()
     plates = build_plates()
     glossary = build_glossary(units, intro)
@@ -953,16 +1046,16 @@ def main() -> None:
         {"id": "g2", "title": "الصف الثاني المتوسط", "subtitle": "أربع وحدات دراسية", "kind": "grade"},
         {"id": "g3", "title": "الصف الثالث المتوسط", "subtitle": "أربع وحدات دراسية", "kind": "grade"},
         {"id": "lessons", "title": "دروس تطبيقية", "subtitle": "خطط الحصص النظرية والعملية", "kind": "lessons"},
-        {"id": "plates", "title": "لوحات من دليل المعلم", "subtitle": "أعمال فنية مصورة من صفحات الدليل", "kind": "plates"},
+        {"id": "plates", "title": "اللوحات", "subtitle": "أعمال فنية مصوّرة", "kind": "plates"},
+        {"id": "theatre", "title": "مفردات الأنشطة المسرحية", "subtitle": "موضوعات الأنشطة المسرحية للمرحلة المتوسطة", "kind": "theatre"},
     ]
 
     curriculum = {
         "schemaVersion": 1,
         "title": "مِرسم",
         "subtitle": "التربية الفنية للمرحلة المتوسطة",
-        "source": "محتوى مكتمل/ملخص_التربية_الفنية.docx",
         "sections": sections,
-        "units": [intro] + units,
+        "units": [intro, theatre] + units,
     }
 
     # Attach plates & glossary references to their units.
@@ -973,7 +1066,6 @@ def main() -> None:
             unit["plate"] = {
                 "asset": plate["asset"],
                 "caption": plate["caption"],
-                "source": plate["source"],
             }
     for entry in glossary:
         unit = by_id.get(entry["unitId"])

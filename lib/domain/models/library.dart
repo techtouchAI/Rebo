@@ -242,19 +242,17 @@ class Question {
   }
 }
 
-/// The scanned plate of the teacher guide that belongs to a unit.
+/// The scanned artwork plate that belongs to a unit.
 class UnitPlate {
-  const UnitPlate({required this.asset, required this.caption, required this.source});
+  const UnitPlate({required this.asset, required this.caption});
 
   final String asset;
   final String caption;
-  final String source;
 
   factory UnitPlate.fromJson(Map<String, dynamic> json) {
     return UnitPlate(
       asset: json['asset'] as String? ?? '',
       caption: json['caption'] as String? ?? '',
-      source: json['source'] as String? ?? '',
     );
   }
 }
@@ -276,6 +274,7 @@ class LearningUnit {
     this.plate,
     this.glossaryIds = const <String>[],
     this.unitText = '',
+    this.intro = '',
   });
 
   final String id;
@@ -293,11 +292,23 @@ class LearningUnit {
   final List<String> glossaryIds;
   final String unitText;
 
+  /// Short presentation paragraph of a section that is not a curriculum unit
+  /// (the theatre themes section).
+  final String intro;
+
   bool get isIntroduction => sectionId == 'intro';
+
+  bool get isTheatre => sectionId == 'theatre';
+
+  /// Sections that carry topics but no unit numbering.
+  bool get isStandalone => isIntroduction || isTheatre;
 
   String get numberLabel {
     if (isIntroduction) {
       return 'مدخل';
+    }
+    if (isTheatre) {
+      return 'قسم';
     }
     return 'الوحدة ${_arabicOrdinal(order)}';
   }
@@ -328,6 +339,7 @@ class LearningUnit {
       plate: plateJson == null ? null : UnitPlate.fromJson(plateJson),
       glossaryIds: _stringList(json['glossary']),
       unitText: json['unitText'] as String? ?? '',
+      intro: json['intro'] as String? ?? '',
     );
   }
 
@@ -388,16 +400,15 @@ class LessonBlock {
   }
 }
 
-/// One of the two sessions (theoretical / practical) of a lesson.
+/// The content of a practical lesson: the presentation and the home assignment.
+///
+/// The weekly-plan rows (objectives, teaching aids and the introduction) and
+/// the separate practical session are intentionally not part of the app.
 class LessonSession {
   const LessonSession({
     required this.kind,
     required this.label,
     required this.subject,
-    required this.generalAims,
-    required this.specificAims,
-    required this.media,
-    required this.introduction,
     required this.body,
     required this.homework,
   });
@@ -405,10 +416,6 @@ class LessonSession {
   final String kind;
   final String label;
   final String subject;
-  final String generalAims;
-  final List<String> specificAims;
-  final String media;
-  final String introduction;
   final List<LessonBlock> body;
   final List<String> homework;
 
@@ -422,10 +429,6 @@ class LessonSession {
       kind: json['kind'] as String? ?? 'theory',
       label: json['label'] as String? ?? '',
       subject: json['subject'] as String? ?? '',
-      generalAims: json['generalAims'] as String? ?? '',
-      specificAims: _stringList(json['specificAims']),
-      media: json['media'] as String? ?? '',
-      introduction: json['introduction'] as String? ?? '',
       body: body,
       homework: _stringList(json['homework']),
     );
@@ -457,20 +460,16 @@ class LessonPlan {
     for (final plan in plans) {
       buffer
         ..write(' ')
-        ..write(plan.subject)
-        ..write(' ')
-        ..write(plan.generalAims)
-        ..write(' ')
-        ..write(plan.introduction);
-      for (final aim in plan.specificAims) {
-        buffer
-          ..write(' ')
-          ..write(aim);
-      }
+        ..write(plan.subject);
       for (final block in plan.body) {
         buffer
           ..write(' ')
           ..write(block.text);
+      }
+      for (final item in plan.homework) {
+        buffer
+          ..write(' ')
+          ..write(item);
       }
     }
     return buffer.toString();
@@ -522,14 +521,13 @@ class GlossaryTerm {
   }
 }
 
-/// A scanned artwork plate taken from the teacher guide.
+/// A scanned artwork plate of a unit.
 class Plate {
   const Plate({
     required this.id,
     required this.asset,
     required this.title,
     required this.caption,
-    required this.source,
     required this.grade,
     required this.unitId,
   });
@@ -538,7 +536,6 @@ class Plate {
   final String asset;
   final String title;
   final String caption;
-  final String source;
   final String grade;
   final String unitId;
 
@@ -548,7 +545,6 @@ class Plate {
       asset: json['asset'] as String? ?? '',
       title: json['title'] as String? ?? '',
       caption: json['caption'] as String? ?? '',
-      source: json['source'] as String? ?? '',
       grade: json['grade'] as String? ?? '',
       unitId: json['unitId'] as String? ?? '',
     );
@@ -690,10 +686,12 @@ int _sectionWeight(String kind) {
       return 1;
     case 'lessons':
       return 2;
-    case 'plates':
+    case 'theatre':
       return 3;
-    default:
+    case 'plates':
       return 4;
+    default:
+      return 5;
   }
 }
 

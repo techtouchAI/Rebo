@@ -151,6 +151,37 @@ class _SectionBlock extends StatelessWidget {
         filter: filter,
       );
     }
+    if (section.kind == 'theatre') {
+      final theatre = state.theatreUnit;
+      if (theatre == null) {
+        return const SizedBox.shrink();
+      }
+      final needle = normalizeArabic(query.trim());
+      if (needle.isNotEmpty &&
+          !normalizeArabic('${theatre.title} ${theatre.searchableText}').contains(needle)) {
+        return const SizedBox.shrink();
+      }
+      if (filter == _IndexFilter.unread && state.isRead(theatre.id)) {
+        return const SizedBox.shrink();
+      }
+      if (filter == _IndexFilter.favorites && !state.isFavorite(theatre.id)) {
+        return const SizedBox.shrink();
+      }
+      return Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            SectionHeader(
+              title: section.title,
+              subtitle: '${toArabicDigits('${theatre.topics.length}')} موضوعات',
+              accent: Theme.of(context).colorScheme.primary,
+            ),
+            _UnitTile(unit: theatre, state: state),
+          ],
+        ),
+      );
+    }
     if (section.kind == 'plates') {
       return _ExtraSection(
         title: section.title,
@@ -159,7 +190,7 @@ class _SectionBlock extends StatelessWidget {
         entries: state.visiblePlates
             .map((Plate plate) => _ExtraEntry(
                   title: plate.title,
-                  subtitle: '${plate.grade} — ${plate.caption}',
+                  subtitle: plate.caption,
                   onTap: () => AppRoutes.openPlate(context, plate),
                 ))
             .toList(growable: false),
@@ -264,7 +295,11 @@ class _UnitTile extends StatelessWidget {
                 child: isRead
                     ? Icon(Icons.check_rounded, color: accent, size: 22)
                     : Text(
-                        unit.isIntroduction ? 'م' : toArabicDigits('${unit.order}'),
+                        unit.isIntroduction
+                            ? 'م'
+                            : unit.isTheatre
+                                ? 'م.م'
+                                : toArabicDigits('${unit.order}'),
                         style: theme.textTheme.titleLarge?.copyWith(color: accent),
                       ),
               ),
@@ -274,7 +309,9 @@ class _UnitTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      unit.isIntroduction ? unit.title : '${unit.numberLabel}: ${unit.displayTitle}',
+                      unit.isIntroduction || unit.isTheatre
+                          ? unit.title
+                          : '${unit.numberLabel}: ${unit.displayTitle}',
                       style: theme.textTheme.titleLarge,
                     ),
                     const SizedBox(height: 2),
@@ -289,7 +326,10 @@ class _UnitTile extends StatelessWidget {
                       spacing: 6,
                       runSpacing: 6,
                       children: <Widget>[
-                        MetaPill(label: '${toArabicDigits('${unit.topics.length}')} موضوعاً', color: accent),
+                        MetaPill(
+                          label: '${toArabicDigits('${unit.topics.length}')} موضوعاً',
+                          color: accent,
+                        ),
                         if (unit.questions.isNotEmpty)
                           MetaPill(
                             label: '${toArabicDigits('${unit.questions.length}')} سؤالاً',

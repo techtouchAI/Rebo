@@ -9,7 +9,7 @@ import '../state/app_state.dart';
 import '../widgets/illustration_figure.dart';
 import '../widgets/text_scale_controls.dart';
 
-/// Lesson plan reader with a tab per session (theory / practice).
+/// Reader of one practical lesson: its presentation and its home assignment.
 class LessonScreen extends StatefulWidget {
   const LessonScreen({super.key, required this.lessonId});
 
@@ -19,15 +19,7 @@ class LessonScreen extends StatefulWidget {
   State<LessonScreen> createState() => _LessonScreenState();
 }
 
-class _LessonScreenState extends State<LessonScreen> with SingleTickerProviderStateMixin {
-  TabController? _tabController;
-
-  @override
-  void dispose() {
-    _tabController?.dispose();
-    super.dispose();
-  }
-
+class _LessonScreenState extends State<LessonScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
@@ -36,9 +28,9 @@ class _LessonScreenState extends State<LessonScreen> with SingleTickerProviderSt
     if (lesson == null) {
       return Scaffold(appBar: AppBar(), body: const Center(child: Text('الدرس غير موجود')));
     }
-    _tabController ??= TabController(length: lesson.plans.length, vsync: this);
     final accent = AppColors.fromAccent(lesson.accent, theme.brightness == Brightness.dark);
     final isFavorite = state.isFavorite(lesson.id);
+    final plan = lesson.plans.isEmpty ? null : lesson.plans.first;
 
     return Scaffold(
       appBar: AppBar(
@@ -51,142 +43,75 @@ class _LessonScreenState extends State<LessonScreen> with SingleTickerProviderSt
           ),
           const TextScaleControls(),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: accent,
-          indicatorColor: accent,
-          tabs: lesson.plans
-              .map((LessonSession plan) => Tab(text: plan.label))
-              .toList(growable: false),
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: lesson.plans
-            .map(
-              (LessonSession plan) => ListView(
-                padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
-                children: <Widget>[
-                  AppPage(
-                    maxWidth: AppLayout.readingMaxWidth,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        const SizedBox(height: AppSpacing.lg),
-                        Wrap(
-                          spacing: AppSpacing.sm,
-                          runSpacing: AppSpacing.sm,
-                          children: <Widget>[
-                            MetaPill(
-                              label: plan.isTheory ? 'حصة نظرية' : 'حصة عملية',
-                              icon: plan.isTheory ? Icons.menu_book_outlined : Icons.brush_outlined,
-                              color: accent,
-                              filled: true,
-                            ),
-                            MetaPill(label: lesson.title, color: theme.colorScheme.secondary),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        Text(plan.subject, style: theme.textTheme.displayMedium?.copyWith(fontSize: 28)),
-                        if (lesson.figures.isNotEmpty) ...<Widget>[
-                          const SizedBox(height: AppSpacing.lg),
-                          IllustrationFigure(
-                            figure: lesson.figures.first,
-                            accent: accent,
-                            height: 220,
+      body: plan == null
+          ? const Center(child: Text('لا يوجد محتوى لهذا الدرس'))
+          : ListView(
+              padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
+              children: <Widget>[
+                AppPage(
+                  maxWidth: AppLayout.readingMaxWidth,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      const SizedBox(height: AppSpacing.lg),
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: <Widget>[
+                          MetaPill(
+                            label: plan.label.isEmpty ? 'درس تطبيقي' : plan.label,
+                            icon: Icons.menu_book_outlined,
+                            color: accent,
+                            filled: true,
                           ),
+                          MetaPill(label: lesson.title, color: theme.colorScheme.secondary),
                         ],
-                        const SizedBox(height: AppSpacing.lg),
-                        _PlanField(
-                          title: 'الموضوع',
-                          icon: Icons.label_outline,
-                          accent: accent,
-                          child: Text(plan.subject, style: theme.textTheme.bodyLarge),
-                        ),
-                        _PlanField(
-                          title: 'الأهداف العامة',
-                          icon: Icons.flag_outlined,
-                          accent: accent,
-                          child: Text(plan.generalAims, style: theme.textTheme.bodyLarge),
-                        ),
-                        _PlanField(
-                          title: 'الأهداف الخاصة',
-                          icon: Icons.checklist_outlined,
-                          accent: accent,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: plan.specificAims
-                                .map((String aim) => Padding(
-                                      padding: const EdgeInsets.only(bottom: 6),
-                                      child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: <Widget>[
-                                          Padding(
-                                            padding: const EdgeInsets.only(top: 6, left: 4, right: 8),
-                                            child: Icon(Icons.check_circle_outline, size: 16, color: accent),
-                                          ),
-                                          Expanded(
-                                            child: Text(aim, style: theme.textTheme.bodyLarge),
-                                          ),
-                                        ],
-                                      ),
-                                    ))
-                                .toList(growable: false),
-                          ),
-                        ),
-                        _PlanField(
-                          title: 'الوسائل التعليمية',
-                          icon: Icons.handyman_outlined,
-                          accent: accent,
-                          child: Wrap(
-                            spacing: AppSpacing.sm,
-                            runSpacing: AppSpacing.sm,
-                            children: plan.media
-                                .split(RegExp(r'[–-]'))
-                                .map((String item) => item.trim())
-                                .where((String item) => item.isNotEmpty)
-                                .map((String item) => Chip(label: Text(item)))
-                                .toList(growable: false),
-                          ),
-                        ),
-                        _PlanField(
-                          title: 'المقدمة',
-                          icon: Icons.play_circle_outline,
-                          accent: accent,
-                          child: Text(plan.introduction, style: theme.textTheme.bodyLarge),
-                        ),
-                        _PlanField(
-                          title: 'العرض',
-                          icon: Icons.article_outlined,
-                          accent: accent,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: plan.body
-                                .map((LessonBlock block) => _BodyBlock(block: block, accent: accent))
-                                .toList(growable: false),
-                          ),
-                        ),
-                        if (plan.homework.isNotEmpty)
-                          _PlanField(
-                            title: 'واجب بيتي',
-                            icon: Icons.home_work_outlined,
-                            accent: theme.colorScheme.tertiary,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: plan.homework
-                                  .map((String item) => Text(item, style: theme.textTheme.bodyLarge))
-                                  .toList(growable: false),
-                            ),
-                          ),
-                        const SizedBox(height: AppSpacing.xl),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(plan.subject, style: theme.textTheme.displayMedium?.copyWith(fontSize: 28)),
+                      if (lesson.summary.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(lesson.summary, style: theme.textTheme.bodyMedium),
                       ],
-                    ),
+                      if (lesson.figures.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: AppSpacing.lg),
+                        IllustrationFigure(
+                          figure: lesson.figures.first,
+                          accent: accent,
+                          height: 220,
+                        ),
+                      ],
+                      const SizedBox(height: AppSpacing.lg),
+                      _PlanField(
+                        title: 'العرض',
+                        icon: Icons.article_outlined,
+                        accent: accent,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: plan.body
+                              .map((LessonBlock block) => _BodyBlock(block: block, accent: accent))
+                              .toList(growable: false),
+                        ),
+                      ),
+                      if (plan.homework.isNotEmpty)
+                        _PlanField(
+                          title: 'واجب بيتي',
+                          icon: Icons.home_work_outlined,
+                          accent: theme.colorScheme.tertiary,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: plan.homework
+                                .map((String item) => Text(item, style: theme.textTheme.bodyLarge))
+                                .toList(growable: false),
+                          ),
+                        ),
+                      const SizedBox(height: AppSpacing.xl),
+                    ],
                   ),
-                ],
-              ),
-            )
-            .toList(growable: false),
-      ),
+                ),
+              ],
+            ),
     );
   }
 }

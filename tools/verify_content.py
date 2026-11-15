@@ -18,6 +18,7 @@ import docx
 
 sys.path.insert(0, str(Path(__file__).parent))
 from contentlib import canon, docx_text, parse_questions, parse_topics, polish  # noqa: E402
+from theatre_content import THEATRE_TOPICS  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTENT = ROOT / "assets" / "content"
@@ -29,6 +30,7 @@ LESSON_DOCS = {
     "الزخرفة": ["الرخرفة.docx", "الزخرفة عملي.docx"],
     "تصميم غلاف كتاب": ["تصميم غلاف كتاب.docx", "تصميم غلاف كتاب عملي.docx"],
 }
+
 
 errors: list[str] = []
 checks = 0
@@ -72,11 +74,13 @@ def main() -> int:
     plates = load("plates.json")
 
     units = curriculum["units"]
-    grade_units = [unit for unit in units if unit["sectionId"] != "intro"]
+    grade_units = [unit for unit in units if unit["sectionId"] not in ("intro", "theatre")]
     intro = [unit for unit in units if unit["sectionId"] == "intro"]
+    theatre = [unit for unit in units if unit["sectionId"] == "theatre"]
 
     expect(len(grade_units) == 12, f"expected 12 grade units, found {len(grade_units)}")
     expect(len(intro) == 1, "expected exactly one introduction unit")
+    expect(len(theatre) == 1, "expected exactly one theatre section")
     expect(len({unit["id"] for unit in units}) == len(units), "duplicate unit ids")
 
     tables = unit_source_cells()
@@ -151,21 +155,24 @@ def main() -> int:
         for method in topic.get("methods", []):
             expect(canon(method["title"])[:20] in canon(intro_text), f"[intro] method missing: {method['title'][:40]}")
 
-    # 5. lessons
+    # 5. lessons: one session per topic, presentation + home assignment only
     expect(len(lessons["lessons"]) == 4, "expected 4 lesson plans")
+    dropped_fields = {"generalAims", "specificAims", "media", "introduction"}
     for lesson in lessons["lessons"]:
-        expect(len(lesson["plans"]) == 2, f"[{lesson['id']}] expected theory + practice")
+        expect(len(lesson["plans"]) == 1, f"[{lesson['id']}] expected a single session")
         source = "\n".join(
             docx_text(docx.Document(str(ROOT / "محتوى مكتمل" / name)))
             for name in LESSON_DOCS[lesson["title"]]
         )
-        blocks = [plan for plan in lesson["plans"]]
-        for plan in blocks:
-            expect(bool(plan["specificAims"]), f"[{lesson['id']}] lesson without objectives")
-            for aim in plan["specificAims"]:
-                expect(canon(aim) in canon(source), f"[{lesson['id']}] invented objective: {aim[:50]}")
+        for plan in lesson["plans"]:
+            expect(bool(plan.get("body")), f"[{lesson['id']}] lesson without content")
+            expect(bool(plan["subject"]), f"[{lesson['id']}] lesson without subject")
+            for field in dropped_fields:
+                expect(field not in plan, f"[{lesson['id']}] weekly-plan field kept: {field}")
             for block in plan["body"]:
                 expect(canon(block["text"]) in canon(source), f"[{lesson['id']}] invented block: {block['text'][:50]}")
+            for item in plan["homework"]:
+                expect(canon(item) in canon(source), f"[{lesson['id']}] invented homework: {item[:50]}")
 
     # 6. glossary + plates
     corpus = canon("\n".join([docx_text(docx.Document(str(SUMMARY_DOC))), intro_text]))
@@ -174,10 +181,37 @@ def main() -> int:
         expect(term["unitId"] in {unit["id"] for unit in units}, f"glossary unit missing: {term['term']}")
     expect(len(glossary["terms"]) >= 15, "glossary too small")
 
-    expect(len(plates["plates"]) == 13, f"expected 13 plates, found {len(plates['plates'])}")
+    expect(len(plates["plates"]) == 12, f"expected 12 plates, found {len(plates['plates'])}")
     for plate in plates["plates"]:
         expect((ROOT / plate["asset"]).exists(), f"missing plate asset: {plate['asset']}")
-        expect(plate["source"].startswith("المصدر:"), f"plate without source: {plate['id']}")
+        expect("source" not in plate, f"plate must carry no source line: {plate['id']}")
+    expect(
+        all(section["kind"] != "plates" or "دليل" not in section["title"].lower() for section in curriculum["sections"]),
+        "the plates section must not be named after the teacher guide",
+    )
+    theatre_unit = theatre[0]
+    expect(bool(theatre_unit["topics"]), "the theatre section has no topics")
+    expect(
+        len(theatre_unit["topics"]) >= 5,
+        f"the theatre section lost topics: {len(theatre_unit['topics'])}",
+    )
+    # The theatre themes live inside the scanned page of the guide (there is no
+    # text layer in the DOCX), so the fidelity check pins the transcription that
+    # ships in the builder and rejects any later drift.
+    expect(
+        [topic["title"] for topic in theatre_unit["topics"]]
+        == [topic["title"] for topic in THEATRE_TOPICS],
+        "the theatre topics left their transcribed source",
+    )
+    for topic in theatre_unit["topics"]:
+        expect(bool(topic["title"].strip()), "theatre topic without title")
+        for bullet in topic["bullets"]:
+            expect(bool(bullet.strip()), "theatre topic without content")
+    expect(bool(theatre_unit.get("intro")), "the theatre section has no introduction")
+    expect(
+        all("theatre" != plate["unitId"] for plate in plates["plates"]),
+        "the theatre section must not be shipped as a plate",
+    )
 
     # 7. illustrations referenced by content must exist
     figures = [figure for unit in units for figure in unit.get("figures", [])]
@@ -198,6 +232,11 @@ def main() -> int:
     print(f"content verification passed ({checks} checks)")
     print(f"units={len(units)} topics={sum(len(u['topics']) for u in units)} questions={total_questions}")
     return 0
+
+
+def _shared_words(text: str, corpus: str) -> int:
+    words = [canon(word) for word in text.split() if len(canon(word)) > 3]
+    return sum(1 for word in words if word in corpus)
 
 
 def collect_source_questions() -> list[str]:
