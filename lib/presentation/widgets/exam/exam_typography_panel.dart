@@ -56,7 +56,7 @@ class ExamTypographyPanel extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        _spacing(),
+        _spacing(Theme.of(context)),
         const SizedBox(height: AppSpacing.lg),
         _preview(context),
       ],
@@ -125,11 +125,10 @@ class ExamTypographyPanel extends StatelessWidget {
 
   /// Line spacing of the exported paper. Word expresses it as 240ths of a
   /// line, so the slider works in percent of the official layout.
-  Widget _spacing() {
+  Widget _spacing(ThemeData theme) {
     final percent = parseIntegerDigits(controllers.lineSpacing.text);
     final valid = ExamPaperTypography.isValidLineSpacing(percent);
     final current = valid ? percent! : ExamPaperTypography.defaultLineSpacingPercent;
-    final theme = Theme.of(context);
     return ExamPanelCard(
       title: 'تباعد الأسطر',
       subtitle: 'قلّل النسبة لتقليل الفراغ بين الأسطر واستيعاب أسئلة أكثر في الصفحة.',
