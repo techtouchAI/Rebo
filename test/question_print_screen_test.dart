@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mirsam/domain/models/library.dart';
 import 'package:mirsam/domain/models/progress.dart';
+import 'package:mirsam/domain/models/question_print_settings.dart';
 import 'package:mirsam/domain/services/question_print_plan.dart';
 import 'package:mirsam/presentation/screens/question_print_screen.dart';
 
@@ -11,8 +11,10 @@ import 'overflow_utils.dart';
 import 'test_support.dart';
 
 Finder unitSelector(String id) => find.byKey(ValueKey<String>('print-unit-$id'));
-Finder unitPreview(String id) => find.byKey(ValueKey<String>('preview-unit-$id'));
 Finder get printButton => find.byKey(const ValueKey<String>('print-questions-button'));
+Finder get fontSelector => find.byKey(const ValueKey<String>('print-font'));
+Finder get bodySize => find.byKey(const ValueKey<String>('print-body-size'));
+Finder get headingSize => find.byKey(const ValueKey<String>('print-heading-size'));
 
 Future<void> tapVisible(WidgetTester tester, Finder target) async {
   await tester.ensureVisible(target);
@@ -26,64 +28,52 @@ void main() {
 
   testWidgets('the home page opens the dedicated printing section', (tester) async {
     await pumpApplication(tester, size: const Size(1280, 1600));
-    await tapVisible(tester, find.text('طباعة الأسئلة'));
+    await tapVisible(tester, find.text('طباعة أسئلة الامتحان'));
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.byType(QuestionPrintScreen), findsOneWidget);
     expect(find.text('اختر الوحدات'), findsOneWidget);
   });
 
-  testWidgets('shows all questions by unit and kind without answers, with all selected',
-      (tester) async {
+  testWidgets('shows selected units and print settings without question contents', (tester) async {
     final state = await pumpScreen(
       tester,
       const QuestionPrintScreen(),
-      size: const Size(900, 8000),
+      size: const Size(900, 1600),
     );
     final units = state.library.unitsOf('g1');
+    expect(find.text('طباعة أسئلة الامتحان'), findsOneWidget);
     for (final unit in units) {
       expect(tester.widget<CheckboxListTile>(unitSelector(unit.id)).value, isTrue);
-      final preview = unitPreview(unit.id);
-      expect(preview, findsOneWidget);
-      final headers = <Finder>[
-        for (final kind in printableQuestionKinds)
-          find.descendant(of: preview, matching: find.text(kind.printHeading)),
-      ];
-      for (final header in headers) {
-        expect(header, findsOneWidget);
-      }
-      final positions = headers.map((header) => tester.getTopLeft(header).dy).toList();
-      expect(positions[0], lessThan(positions[1]));
-      expect(positions[1], lessThan(positions[2]));
+      expect(find.text(unit.title), findsOneWidget);
+      expect(find.byKey(ValueKey<String>('preview-unit-${unit.id}')), findsNothing);
       for (final question in unit.questions) {
         expect(
-          find.descendant(of: preview, matching: find.textContaining(question.prompt)),
-          findsOneWidget,
-          reason: '${unit.id}/${question.id} is missing',
+          find.textContaining(question.prompt),
+          findsNothing,
+          reason: '${unit.id}/${question.id}',
         );
-        if (question.answerSupport != null) {
-          expect(find.textContaining(question.answerSupport!), findsNothing);
-        }
-        if (question.kind == QuestionKind.open && question.textAnswer != null) {
-          expect(find.textContaining(question.textAnswer!), findsNothing);
-        }
       }
     }
-    expect(find.byKey(const ValueKey<String>('preview-unit-g2-u1')), findsNothing);
-    final firstChoice = units.first.questions.firstWhere((q) => q.kind == QuestionKind.choice);
-    expect(find.textContaining('(أ) ${firstChoice.options.first}'), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('print-unit-g2-u1')), findsNothing);
     expect(find.textContaining('٣ وحدة • ٢٥ سؤالاً'), findsOneWidget);
+    expect(fontSelector, findsOneWidget);
+    expect(tester.widget<TextField>(bodySize).controller!.text, '12');
+    expect(tester.widget<TextField>(headingSize).controller!.text, '14');
   });
 
-  testWidgets('prints one, two, or every selected unit; never prints an empty selection',
-      (tester) async {
+  testWidgets('prints one, two, or every selected unit; never prints an empty selection', (
+    tester,
+  ) async {
     final printed = <QuestionPrintPlan>[];
     final grades = <String>[];
     await pumpScreen(
       tester,
-      QuestionPrintScreen(printQuestions: (QuestionPrintPlan plan, String grade) async {
-        printed.add(plan);
-        grades.add(grade);
-      }),
+      QuestionPrintScreen(
+        printQuestions: (QuestionPrintPlan plan, String grade) async {
+          printed.add(plan);
+          grades.add(grade);
+        },
+      ),
       size: const Size(900, 1600),
     );
 
@@ -110,13 +100,79 @@ void main() {
     expect(printed[2].questionCount, 25);
   });
 
-  testWidgets('changing grade resets the selection and excludes the previous grade', (tester) async {
+  testWidgets('passes the selected font and numeric sizes without changing reading settings', (
+    tester,
+  ) async {
     QuestionPrintPlan? printed;
     final state = await pumpScreen(
       tester,
-      QuestionPrintScreen(printQuestions: (QuestionPrintPlan plan, String grade) async {
-        printed = plan;
-      }),
+      QuestionPrintScreen(
+        printQuestions: (QuestionPrintPlan plan, String grade) async {
+          printed = plan;
+        },
+      ),
+      size: const Size(900, 1600),
+    );
+    final readingFont = state.font;
+    final readingScale = state.textScale;
+    await tapVisible(tester, fontSelector);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('أميري').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(bodySize, '١٨');
+    await tester.enterText(headingSize, '۲۴');
+    await tester.pump();
+    await tester.tap(printButton);
+    await tester.pump();
+
+    expect(printed!.settings.font, QuestionPrintFont.amiri);
+    expect(printed!.settings.bodyFontSize, 18);
+    expect(printed!.settings.headingFontSize, 24);
+    expect(state.font, readingFont);
+    expect(state.textScale, readingScale);
+  });
+
+  testWidgets('invalid or empty sizes prevent printing until corrected', (tester) async {
+    final printed = <QuestionPrintPlan>[];
+    await pumpScreen(
+      tester,
+      QuestionPrintScreen(
+        printQuestions: (QuestionPrintPlan plan, String grade) async {
+          printed.add(plan);
+        },
+      ),
+      size: const Size(900, 1600),
+    );
+    for (final value in <String>['7', '33', '']) {
+      await tester.enterText(bodySize, value);
+      await tester.pump();
+      expect(tester.widget<FilledButton>(printButton).onPressed, isNull);
+      expect(find.text('أدخل أحجام خط صحيحة'), findsOneWidget);
+    }
+    await tester.enterText(bodySize, '٨');
+    await tester.enterText(headingSize, '٣٣');
+    await tester.pump();
+    expect(tester.widget<FilledButton>(printButton).onPressed, isNull);
+    await tester.enterText(headingSize, '٣٢');
+    await tester.pump();
+    expect(tester.widget<FilledButton>(printButton).onPressed, isNotNull);
+    await tester.tap(printButton);
+    await tester.pump();
+    expect(printed.single.settings.bodyFontSize, 8);
+    expect(printed.single.settings.headingFontSize, 32);
+  });
+
+  testWidgets('changing grade resets the selection and excludes the previous grade', (
+    tester,
+  ) async {
+    QuestionPrintPlan? printed;
+    final state = await pumpScreen(
+      tester,
+      QuestionPrintScreen(
+        printQuestions: (QuestionPrintPlan plan, String grade) async {
+          printed = plan;
+        },
+      ),
       size: const Size(900, 1600),
     );
     await tapVisible(tester, unitSelector('g1-u1'));
@@ -137,13 +193,21 @@ void main() {
     final completion = Completer<void>();
     await pumpScreen(
       tester,
-      QuestionPrintScreen(printQuestions: (QuestionPrintPlan plan, String grade) => completion.future),
+      QuestionPrintScreen(
+        printQuestions: (QuestionPrintPlan plan, String grade) => completion.future,
+      ),
       size: const Size(900, 1600),
     );
     await tester.tap(printButton);
     await tester.pump();
     expect(tester.widget<FilledButton>(printButton).onPressed, isNull);
     expect(tester.widget<CheckboxListTile>(unitSelector('g1-u1')).onChanged, isNull);
+    expect(tester.widget<TextField>(bodySize).enabled, isFalse);
+    expect(tester.widget<TextField>(headingSize).enabled, isFalse);
+    expect(
+      tester.widget<DropdownButtonFormField<QuestionPrintFont>>(fontSelector).onChanged,
+      isNull,
+    );
     expect(find.text('جاري التحضير'), findsOneWidget);
     completion.complete();
     await tester.pump();
@@ -153,9 +217,11 @@ void main() {
   testWidgets('reports a printing failure and allows retry', (tester) async {
     await pumpScreen(
       tester,
-      QuestionPrintScreen(printQuestions: (QuestionPrintPlan plan, String grade) async {
-        throw StateError('printer unavailable');
-      }),
+      QuestionPrintScreen(
+        printQuestions: (QuestionPrintPlan plan, String grade) async {
+          throw StateError('printer unavailable');
+        },
+      ),
       size: const Size(900, 1600),
     );
     await tester.tap(printButton);
@@ -164,8 +230,9 @@ void main() {
     expect(tester.widget<FilledButton>(printButton).onPressed, isNotNull);
   });
 
-  testWidgets('shows an empty state and disables printing when a grade has no questions',
-      (tester) async {
+  testWidgets('shows an empty state and disables printing when a grade has no questions', (
+    tester,
+  ) async {
     await pumpScreen(
       tester,
       const QuestionPrintScreen(),
@@ -181,6 +248,10 @@ void main() {
       tester.platformDispatcher.textScaleFactorTestValue = 1.2;
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await pumpScreen(tester, const QuestionPrintScreen(), size: Size(width, 800));
+      expect(tester.takeException(), isNull);
+      expect(findFlexOverflows(tester), isEmpty);
+      await tester.ensureVisible(headingSize);
+      await tester.pump();
       expect(tester.takeException(), isNull);
       expect(findFlexOverflows(tester), isEmpty);
     });

@@ -1,7 +1,8 @@
 import '../../core/utils/arabic_text.dart';
 import '../models/library.dart';
+import '../models/question_print_settings.dart';
 
-/// The order used both in each unit's on-screen list and in the printed paper.
+/// The order in which question types appear on the printed paper.
 const List<QuestionKind> printableQuestionKinds = <QuestionKind>[
   QuestionKind.trueFalse,
   QuestionKind.choice,
@@ -10,10 +11,10 @@ const List<QuestionKind> printableQuestionKinds = <QuestionKind>[
 
 extension PrintableQuestionKind on QuestionKind {
   String get printHeading => switch (this) {
-        QuestionKind.trueFalse => 'الصح والخطأ',
-        QuestionKind.choice => 'الاختيارات',
-        QuestionKind.open => 'التعداد',
-      };
+    QuestionKind.trueFalse => 'الصح والخطأ',
+    QuestionKind.choice => 'الاختيارات',
+    QuestionKind.open => 'التعداد',
+  };
 }
 
 /// Units with questions, in curriculum order. Keep different grade sections in
@@ -43,7 +44,7 @@ List<Question> questionsOfKind(LearningUnit unit, QuestionKind kind) =>
 
 class QuestionPrintUnitGroup {
   QuestionPrintUnitGroup(this.unit, Iterable<Question> questions)
-      : questions = List<Question>.unmodifiable(questions);
+    : questions = List<Question>.unmodifiable(questions);
 
   final LearningUnit unit;
   final List<Question> questions;
@@ -51,7 +52,7 @@ class QuestionPrintUnitGroup {
 
 class QuestionPrintSection {
   QuestionPrintSection(this.kind, Iterable<QuestionPrintUnitGroup> groups)
-      : groups = List<QuestionPrintUnitGroup>.unmodifiable(groups);
+    : groups = List<QuestionPrintUnitGroup>.unmodifiable(groups);
 
   final QuestionKind kind;
   final List<QuestionPrintUnitGroup> groups;
@@ -62,11 +63,12 @@ class QuestionPrintSection {
 class QuestionPrintPlan {
   factory QuestionPrintPlan.fromSelection(
     Iterable<LearningUnit> availableUnits,
-    Set<String> selectedIds,
-  ) {
-    final units = printableUnits(availableUnits)
-        .where((LearningUnit unit) => selectedIds.contains(unit.id))
-        .toList(growable: false);
+    Set<String> selectedIds, {
+    QuestionPrintSettings settings = const QuestionPrintSettings(),
+  }) {
+    final units = printableUnits(
+      availableUnits,
+    ).where((LearningUnit unit) => selectedIds.contains(unit.id)).toList(growable: false);
     final sections = <QuestionPrintSection>[];
     for (final kind in printableQuestionKinds) {
       final groups = <QuestionPrintUnitGroup>[];
@@ -80,37 +82,76 @@ class QuestionPrintPlan {
         sections.add(QuestionPrintSection(kind, groups));
       }
     }
-    return QuestionPrintPlan._(units, sections);
+    return QuestionPrintPlan._(units, sections, settings);
   }
 
-  QuestionPrintPlan._(Iterable<LearningUnit> units, Iterable<QuestionPrintSection> sections)
-      : units = List<LearningUnit>.unmodifiable(units),
-        sections = List<QuestionPrintSection>.unmodifiable(sections);
+  QuestionPrintPlan._(
+    Iterable<LearningUnit> units,
+    Iterable<QuestionPrintSection> sections,
+    this.settings,
+  ) : units = List<LearningUnit>.unmodifiable(units),
+      sections = List<QuestionPrintSection>.unmodifiable(sections);
 
   final List<LearningUnit> units;
   final List<QuestionPrintSection> sections;
+  final QuestionPrintSettings settings;
 
   bool get isEmpty => sections.isEmpty;
 
   int get questionCount => units.fold<int>(0, (sum, unit) => sum + unit.questions.length);
 }
 
-/// A compact, answer-free question line. Choice options are preserved, but no
-/// correct answer, explanation, or previously selected quiz response is used.
+/// A question with its documented answer, independent of quiz responses.
+/// Missing or invalid answers are identified explicitly rather than guessed.
 String formatPrintableQuestion(Question question, int number) {
   final prompt = '${toArabicDigits('$number')}. ${question.prompt}';
   switch (question.kind) {
     case QuestionKind.trueFalse:
-      return '$prompt  (     )';
+      final answer = switch (question.boolAnswer) {
+        true => 'صح',
+        false => 'خطأ',
+        null => _missingAnswer,
+      };
+      final correction = question.boolAnswer == false ? question.answerSupport?.trim() : null;
+      final detail = correction == null || correction.isEmpty ? '' : '  التصحيح: $correction';
+      return '$prompt  الإجابة: $answer$detail';
     case QuestionKind.choice:
       final options = <String>[
         for (var i = 0; i < question.options.length; i++)
           '(${_choiceLabel(i)}) ${question.options[i]}',
       ];
-      return options.isEmpty ? prompt : '$prompt  ${options.join('   ')}';
+      final index = question.answerIndex;
+      final answer = index == null || index < 0 || index >= question.options.length
+          ? _missingAnswer
+          : '(${_choiceLabel(index)}) ${question.options[index]}';
+      final choices = options.isEmpty ? '' : '  ${options.join('   ')}';
+      return '$prompt$choices  الإجابة: $answer';
     case QuestionKind.open:
-      return prompt;
+      return '$prompt  الإجابة: ${_formatEnumeration(question.textAnswer)}';
   }
+}
+
+const String _missingAnswer = 'غير متوفرة في المصدر';
+
+/// Source enumeration answers are normally numbered on separate lines. Lay
+/// them out inline, with consecutive Arabic-Indic numbers, while retaining the
+/// wording of each item. Also accepts future unnumbered or CRLF-separated
+/// answers and does not invent an answer when the source is empty.
+String _formatEnumeration(String? answer) {
+  final prefix = RegExp(r'^[0-9٠-٩۰-۹]{1,3}\s*[-–—.،)]\s*');
+  final items = (answer ?? '')
+      .split(RegExp(r'\r\n?|\n'))
+      .map((line) => line.trim().replaceFirst(prefix, '').trim())
+      .where((line) => line.isNotEmpty)
+      .toList(growable: false);
+  if (items.isEmpty) {
+    return _missingAnswer;
+  }
+  return <String>[
+    // Keep the number attached to the first word so it cannot be orphaned at
+    // the end of a PDF line; separate complete items with two spaces.
+    for (var i = 0; i < items.length; i++) '${toArabicDigits('${i + 1}')}-${items[i]}',
+  ].join('  ');
 }
 
 String _choiceLabel(int index) {

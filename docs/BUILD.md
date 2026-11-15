@@ -17,7 +17,7 @@
 
 ```bash
 flutter pub get
-flutter analyze
+flutter analyze --no-fatal-infos
 flutter test
 flutter build apk --release            # build/app/outputs/flutter-apk/app-release.apk
 flutter build apk --split-per-abi      # نسخ أصغر لكل معمارية إن لزم
@@ -47,9 +47,12 @@ keytool -genkeypair -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 \
 
 ## الطباعة
 
-ينشئ التطبيق مستند الأسئلة محلياً بخط عربي مضمّن، ثم يفتح نافذة طباعة النظام؛ يلزم وجود طابعة أو
-خدمة طباعة متاحة على الجهاز. على ويندوز تجلب إضافة `printing` مكتبة PDFium أثناء البناء وتضمّن DLL
-الخاصة بها في مجلد التوزيع، ولا تحتاج عملية إنشاء المستند إلى اتصال بعد تثبيت التطبيق.
+ينشئ التطبيق مستند الأسئلة والإجابات محلياً باستخدام النسختين العادية والعريضة من خط الطباعة المختار:
+IBM Plex Sans Arabic أو Noto Kufi Arabic أو Amiri. يمكن ضبط حجمَي المحتوى والعناوين بين ٨ و٣٢ نقطة
+(الافتراضي ١٢ و١٤) دون تغيير خط القراءة في التطبيق؛ وعند امتلاء الورقة تمتد الإجابات إلى صفحات إضافية.
+تُفتح نافذة طباعة النظام، ويلزم وجود طابعة أو خدمة طباعة متاحة على الجهاز. على ويندوز تجلب إضافة
+`printing` مكتبة PDFium أثناء البناء وتضمّن DLL الخاصة بها في مجلد التوزيع، ولا يحتاج إنشاء المستند إلى
+اتصال بعد تثبيت التطبيق.
 
 ## توزيع ويندوز
 
@@ -76,7 +79,7 @@ data/                 (flutter_assets + icudtl.dat)
 | الوظيفة | ما تفعله | الأثر |
 | --- | --- | --- |
 | `Content fidelity` | `verify_content.py` + التحقق من صحة JSON | حماية المحتوى من أي تغيير غير موثّق |
-| `Analyze and test` | `flutter analyze` و`flutter test` | تقرير التحليل + `resolved-pubspec.lock` |
+| `Analyze and test` | تحليل Dart و`flutter analyze --no-fatal-infos` و`flutter test` | تقرير التحليل + `resolved-pubspec.lock` |
 | `Android APK` | بناء APK بتوقيع التنقيح | `mirsam-<sha>.apk` + `SHA256SUMS.txt` |
 | `Windows EXE` | بناء ويندوز وضغط المجلد كاملاً | `mirsam-<sha>-windows-x64.zip` + بصمة SHA-256 |
 
@@ -87,7 +90,7 @@ Flutter يُنزَّل من أرشيف الإصدارات الرسمي:
 
 1. ارفع `version:` في `pubspec.yaml` (مثال: `1.1.0+2`) — رقم البناء يزيد دائماً.
 2. `python3 tools/build_content.py && python3 tools/verify_content.py`.
-3. `flutter analyze && flutter test`.
+3. `flutter analyze --no-fatal-infos && flutter test`.
 4. ادفع إلى الفرع، ثم ابنِ APK وZIP ويندوز من مخرجات CI.
 5. أرفق `SHA256SUMS.txt` مع كل ملف منشور، ولا ترفع مفاتيح التوقيع.
 

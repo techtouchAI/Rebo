@@ -301,8 +301,8 @@ class _SectionsGrid extends StatelessWidget {
     final sections = <ContentSection>[
       const ContentSection(
         id: 'question-printing',
-        title: 'طباعة الأسئلة',
-        subtitle: 'اختر الوحدات واطبع أسئلتها فقط',
+        title: 'طباعة أسئلة الامتحان',
+        subtitle: 'اختر الوحدات واطبع أسئلتها مع الإجابات',
         kind: 'question-printing',
       ),
       ...state.visibleSections,
