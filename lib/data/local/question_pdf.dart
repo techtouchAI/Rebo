@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/services.dart' show AssetBundle, rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -30,14 +28,14 @@ class QuestionPdfBuilder {
 
     final bundle = assetBundle ?? rootBundle;
     // PDF's Arabic shaper uses presentation forms, including isolated yeh.
-    // These bundled fonts include those glyphs; some UI fonts do not.
-    final fonts = await Future.wait<ByteData>(<Future<ByteData>>[
-      bundle.load('assets/fonts/IBMPlexSansArabic-Regular.ttf'),
-      bundle.load('assets/fonts/IBMPlexSansArabic-Bold.ttf'),
-    ]);
+    // These bundled fonts include those glyphs; some UI fonts do not. Await
+    // each asset directly because Flutter asset bundles can return a
+    // SynchronousFuture, which is not safe to combine with Future.wait.
+    final regularFont = await bundle.load('assets/fonts/IBMPlexSansArabic-Regular.ttf');
+    final boldFont = await bundle.load('assets/fonts/IBMPlexSansArabic-Bold.ttf');
     final theme = pw.ThemeData.withFont(
-      base: pw.Font.ttf(fonts[0]),
-      bold: pw.Font.ttf(fonts[1]),
+      base: pw.Font.ttf(regularFont),
+      bold: pw.Font.ttf(boldFont),
     );
     // The font's default space is very narrow, especially next to Arabic
     // joining forms. A little extra word spacing keeps printed words distinct.

@@ -1,5 +1,8 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mirsam/data/local/question_pdf.dart';
 import 'package:mirsam/domain/models/library.dart';
@@ -8,6 +11,28 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'test_support.dart';
+
+const _regularFontAsset = 'assets/fonts/IBMPlexSansArabic-Regular.ttf';
+const _boldFontAsset = 'assets/fonts/IBMPlexSansArabic-Bold.ttf';
+
+/// Delivers real font data either immediately or in a later microtask.
+class _FontAssetBundle extends CachingAssetBundle {
+  _FontAssetBundle(this.fonts, {required this.synchronous});
+
+  final Map<String, ByteData> fonts;
+  final bool synchronous;
+  final List<String> requested = <String>[];
+
+  @override
+  Future<ByteData> load(String key) {
+    requested.add(key);
+    final data = fonts[key];
+    if (data == null) {
+      return Future<ByteData>.error(StateError('Missing asset: $key'));
+    }
+    return synchronous ? SynchronousFuture<ByteData>(data) : Future<ByteData>.value(data);
+  }
+}
 
 /// Decode the text runs written by the pinned PDF library and its embedded
 /// font maps. This examines the generated page, not just the print plan.
@@ -90,10 +115,53 @@ LearningUnit longQuestionUnit() {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Library library;
+  late Map<String, ByteData> fontData;
 
   setUpAll(() async {
     library = await ensureLibrary();
+    fontData = <String, ByteData>{
+      _regularFontAsset: await rootBundle.load(_regularFontAsset),
+      _boldFontAsset: await rootBundle.load(_boldFontAsset),
+    };
   });
+
+  for (final synchronous in <bool>[true, false]) {
+    test('loads fonts delivered ${synchronous ? 'synchronously' : 'asynchronously'}', () async {
+      final unit = library.unitsOf('g1').first;
+      final plan = QuestionPrintPlan.fromSelection(<LearningUnit>[unit], <String>{unit.id});
+      final bundle = _FontAssetBundle(fontData, synchronous: synchronous);
+
+      final document = await const QuestionPdfBuilder().build(
+        plan,
+        gradeTitle: unit.grade,
+        assetBundle: bundle,
+      );
+
+      expect(bundle.requested, <String>[_regularFontAsset, _boldFontAsset]);
+      expect(document.document.pdfPageList.pages, hasLength(1));
+      expect(await document.save(), isNotEmpty);
+    });
+  }
+
+  for (final missing in <String>[_regularFontAsset, _boldFontAsset]) {
+    test('propagates a failure to load $missing', () async {
+      final unit = library.unitsOf('g1').first;
+      final plan = QuestionPrintPlan.fromSelection(<LearningUnit>[unit], <String>{unit.id});
+      final available = Map<String, ByteData>.of(fontData)..remove(missing);
+      final bundle = _FontAssetBundle(available, synchronous: true);
+
+      await expectLater(
+        const QuestionPdfBuilder().build(plan, gradeTitle: unit.grade, assetBundle: bundle),
+        throwsA(isA<StateError>()),
+      );
+      expect(
+        bundle.requested,
+        missing == _regularFontAsset
+            ? <String>[_regularFontAsset]
+            : <String>[_regularFontAsset, _boldFontAsset],
+      );
+    });
+  }
 
   test('every non-empty unit selection fits on A4 at the requested sizes', () async {
     for (final grade in <String>['g1', 'g2', 'g3']) {
@@ -206,11 +274,17 @@ void main() {
     expect(runs.where((run) => run == 'ﺮﺻﺎﻨﻋ'), hasLength(3000));
   });
 
-  test('refuses an empty print selection before invoking any printer', () async {
+  test('rejects an empty print selection before loading any assets', () async {
     final plan = QuestionPrintPlan.fromSelection(library.unitsOf('g1'), <String>{});
+    final bundle = _FontAssetBundle(<String, ByteData>{}, synchronous: true);
     await expectLater(
-      const QuestionPdfBuilder().build(plan, gradeTitle: 'الصف الأول المتوسط'),
+      const QuestionPdfBuilder().build(
+        plan,
+        gradeTitle: 'الصف الأول المتوسط',
+        assetBundle: bundle,
+      ),
       throwsArgumentError,
     );
+    expect(bundle.requested, isEmpty);
   });
 }
