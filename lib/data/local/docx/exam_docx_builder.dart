@@ -11,9 +11,9 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 
-import '../../domain/models/exam_paper.dart';
-import '../../domain/models/library.dart';
-import '../../domain/services/exam_paper_formatter.dart';
+import '../../../domain/models/exam_paper.dart';
+import '../../../domain/models/library.dart';
+import '../../../domain/services/exam_paper_formatter.dart';
 import 'stored_zip_writer.dart';
 
 abstract final class ExamDocxBuilder {

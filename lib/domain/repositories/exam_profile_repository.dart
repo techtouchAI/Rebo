@@ -2,7 +2,7 @@
 /// the next exam paper so that only the questions change.
 library;
 
-import 'exam_paper.dart';
+import '../models/exam_paper.dart';
 
 class ExamProfile {
   const ExamProfile({
