@@ -123,7 +123,14 @@ jobs:
           echo "$HOME/flutter/bin" >> "$GITHUB_PATH"
           git config --global --add safe.directory "$HOME/flutter"
       - name: Build the release APK
-        run: flutter build apk --release
+        # The build log is annotated so a failure can be read back through the
+        # check-run annotations (workflow logs are not always reachable).
+        run: |
+          set +e
+          flutter build apk --release --verbose 2>&1 | tee "$RUNNER_TEMP/apk-build.log"
+          status=${PIPESTATUS[0]}
+          python3 tools/ci_report.py log "$RUNNER_TEMP/apk-build.log"
+          exit $status
       - name: Verify the packaged APK
         run: |
           set -euo pipefail

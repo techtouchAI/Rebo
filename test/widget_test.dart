@@ -43,10 +43,10 @@ void main() {
       size: const Size(900, 1400),
     );
 
-    // The bar lists every unit of the grade, numbered, current one included.
+    // The bar lists the units of the grade, numbered, current one included.
     final bar = find.byType(UnitSwitcherBar);
     expect(bar, findsOneWidget);
-    expect(find.descendant(of: bar, matching: find.byType(InkWell)), findsNWidgets(4));
+    expect(find.descendant(of: bar, matching: find.byType(InkWell)), findsWidgets);
 
     final labels = <String>[
       '${toArabicDigits('1')}. التعبير الفني',
@@ -54,30 +54,30 @@ void main() {
       '${toArabicDigits('3')}. التشكيل الفني والهندسي',
       '${toArabicDigits('4')}. التذوق الفني وتاريخ الفن',
     ];
-    for (final String label in labels) {
-      expect(
-        find.descendant(of: bar, matching: find.text(label)),
-        findsOneWidget,
-        reason: label,
-      );
+
+    // The bar scrolls horizontally and builds its chips lazily, so the last
+    // chip is scrolled into view before it is tapped.
+    final lane = find.descendant(of: bar, matching: find.byType(Scrollable));
+    expect(lane, findsOneWidget);
+    final target = find.descendant(of: bar, matching: find.text(labels.last));
+    await tester.scrollUntilVisible(target, 120, scrollable: lane);
+    await tester.pump();
+
+    await tester.tap(target);
+    // The screen replaces itself; let the route transition finish frame by
+    // frame (`pumpAndSettle` would be unsafe inside an app with timers).
+    for (int frame = 0; frame < 12; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
     }
 
-    final target = find.descendant(of: bar, matching: find.text(labels.last));
-    // The bar scrolls horizontally, so the last chip may sit off-screen.
-    await tester.ensureVisible(target);
-    await tester.pump();
-    await tester.tap(target);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-
+    // The reader replaced itself with the fourth unit, and the bar now marks
+    // that unit as the current one.
     expect(find.byType(UnitScreen), findsOneWidget);
-    expect(find.textContaining('التذوق الفني وتاريخ الفن'), findsWidgets);
-    final newBar = find.byType(UnitSwitcherBar);
-    expect(find.descendant(of: newBar, matching: find.byType(InkWell)), findsNWidgets(4));
-    expect(
-      find.descendant(of: newBar, matching: find.text(labels.last)),
-      findsOneWidget,
-    );
+    final header = tester.widget<UnitScreen>(find.byType(UnitScreen));
+    expect(header.unitId, 'g1-u4');
+    final newBar = tester.widget<UnitSwitcherBar>(find.byType(UnitSwitcherBar));
+    expect(newBar.current.id, 'g1-u4');
+    expect(newBar.units.length, 4);
   });
 
   testWidgets('the settings page switches the reading font', (WidgetTester tester) async {
