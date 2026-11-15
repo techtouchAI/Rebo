@@ -20,13 +20,19 @@ sys.path.insert(0, str(Path(__file__).parent))
 from contentlib import (  # noqa: E402
     canon,
     parse_malzama_docx,
+    read_docx_media,
     read_docx_plain_text,
+)
+from drawings_content import (  # noqa: E402
+    DRAWINGS,
+    DRAWINGS_TITLE,
 )
 from theatre_content import THEATRE_TOPICS  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTENT = ROOT / "assets" / "content"
 MALZAMA_DOC = ROOT / "ملزمة_التربية_الفنية_بنموذج_إجابة_موحد.docx"
+DRAWINGS_DOC = ROOT / "التربية_الفنية_14_موضوعا_صورة_واحدة_لكل_موضوع.docx"
 INTRO_DOC = ROOT / "محتوى مكتمل" / "مقدمة.docx"
 LESSON_DOCS = {
     "الظل والضوء": ["الظل والضوء.docx", "الظل والضوء العملي.docx"],
@@ -60,6 +66,7 @@ def main() -> int:
     lessons = load("lessons.json")
     glossary = load("glossary.json")
     plates = load("plates.json")
+    drawings_json = load("drawings.json")
 
     units = curriculum["units"]
     grade_units = [unit for unit in units if unit["sectionId"] not in ("intro", "theatre")]
@@ -214,7 +221,75 @@ def main() -> int:
         "the plates section must not be named after the teacher guide",
     )
 
-    # 6. Theatre
+    # 6. Topic drawings: one source picture per topic, attached to its topic
+    drawings = drawings_json["drawings"]
+    expect(len(drawings) == len(DRAWINGS), f"expected {len(DRAWINGS)} drawings, found {len(drawings)}")
+    expect(drawings_json.get("title") == DRAWINGS_TITLE, "the drawings section changed its title")
+    expect(bool(drawings_json.get("intro")), "the drawings section has no introduction")
+    source_pictures = read_docx_media(DRAWINGS_DOC)
+    expect(
+        len(source_pictures) == len(DRAWINGS),
+        f"the drawings booklet holds {len(source_pictures)} pictures, expected {len(DRAWINGS)}",
+    )
+    drawing_assets: set[str] = set()
+    for index, (drawing, spec) in enumerate(zip(drawings, DRAWINGS), start=1):
+        did = drawing["id"]
+        expect(did == f"drawing-{index:02d}", f"drawing id out of document order: {did}")
+        expect(drawing["order"] == index, f"[{did}] wrong order")
+        expect(
+            canon(drawing["title"]) == canon(spec["title"]),
+            f"[{did}] caption differs from its source page: {drawing['title']}",
+        )
+        expect(drawing["unitId"] == spec["unitId"], f"[{did}] unit link changed")
+        expect(drawing["topicId"] == spec["topicId"], f"[{did}] topic link changed")
+        unit = unit_map.get(drawing["unitId"])
+        expect(
+            unit is not None and unit["sectionId"] not in ("intro", "theatre"),
+            f"[{did}] the drawing is not attached to a grade unit",
+        )
+        if unit is not None:
+            topics = {topic["id"]: topic for topic in unit["topics"]}
+            expect(drawing["topicId"] in topics, f"[{did}] drawing topic missing in {drawing['unitId']}")
+            if drawing["topicId"] in topics:
+                topic = topics[drawing["topicId"]]
+                expect(
+                    canon(drawing["topicTitle"]) == canon(topic["title"]),
+                    f"[{did}] topic title mismatch",
+                )
+                expected_caption = f"{unit['displayTitle']} — {topic['title']}"
+                expect(
+                    canon(drawing["caption"]) == canon(expected_caption),
+                    f"[{did}] caption is not derived from its unit and topic",
+                )
+            expect(drawing["unitTitle"] == unit["displayTitle"], f"[{did}] unit title mismatch")
+            expect(drawing["grade"] == unit["grade"], f"[{did}] grade mismatch")
+        asset = ROOT / drawing["asset"]
+        expect(asset.exists(), f"[{did}] missing picture: {drawing['asset']}")
+        expect(drawing["asset"] not in drawing_assets, f"[{did}] the same picture is reused")
+        drawing_assets.add(drawing["asset"])
+        if asset.exists() and index <= len(source_pictures):
+            expect(
+                asset.read_bytes() == source_pictures[index - 1][1],
+                f"[{did}] picture bytes differ from source page {index}",
+            )
+    expect(
+        len({drawing["unitId"] for drawing in drawings}) >= 5,
+        "the drawings are not spread across the grade units",
+    )
+    expect(
+        any(section["kind"] == "drawings" for section in curriculum["sections"]),
+        "the drawings section is missing from the table of contents",
+    )
+    expect(
+        all(unit["sectionId"] != "drawings" for unit in units),
+        "the drawings must be a section of their own, not a unit",
+    )
+    expect(
+        all(plate["asset"] not in drawing_assets for plate in plates["plates"]),
+        "a topic drawing was shipped as a plate",
+    )
+
+    # 7. Theatre
     theatre_unit = theatre[0]
     expect(bool(theatre_unit["topics"]), "the theatre section has no topics")
     expect(len(theatre_unit["topics"]) >= 5, f"the theatre section lost topics: {len(theatre_unit['topics'])}")
@@ -233,7 +308,7 @@ def main() -> int:
         "the theatre section must not be shipped as a plate",
     )
 
-    # 7. Illustrations referenced by content must exist
+    # 8. Illustrations referenced by content must exist
     figures = [figure for unit in units for figure in unit.get("figures", [])]
     figures += [figure for lesson in lessons["lessons"] for figure in lesson.get("figures", [])]
     for figure in figures:
@@ -246,7 +321,10 @@ def main() -> int:
             print(" -", error)
         return 1
     print(f"content verification passed ({checks} checks)")
-    print(f"units={len(units)} topics={sum(len(u['topics']) for u in units)} questions={total_questions} plates={len(plates['plates'])}")
+    print(
+        f"units={len(units)} topics={sum(len(u['topics']) for u in units)} "
+        f"questions={total_questions} plates={len(plates['plates'])} drawings={len(drawings)}"
+    )
     return 0
 
 

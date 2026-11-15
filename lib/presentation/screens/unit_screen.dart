@@ -176,7 +176,11 @@ class _UnitScreenState extends State<UnitScreen> {
                     subtitle: '${toArabicDigits('${unit.topics.length}')} موضوعاً — ${unit.template.label}',
                     accent: accent,
                   ),
-                  UnitSections(unit: unit, accent: accent),
+                  UnitSections(
+                    unit: unit,
+                    accent: accent,
+                    drawings: state.drawingsOfUnit(unit.id),
+                  ),
                   if (unit.plates.isNotEmpty) ...<Widget>[
                     const SizedBox(height: AppSpacing.xl),
                     SectionHeader(

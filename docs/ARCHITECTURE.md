@@ -11,21 +11,22 @@ lib/
 │   ├── utils/arabic_text.dart تطبيع البحث، المقتطفات، الأرقام، زمن القراءة
 │   └── widgets/               عناصر مشتركة (AppPage, SectionHeader, MetaPill…)
 ├── domain/
-│   ├── models/library.dart    نماذج المحتوى + PresentationTemplate + QuestionKind
+│   ├── models/library.dart    نماذج المحتوى + PresentationTemplate + QuestionKind + TopicDrawing
 │   ├── models/progress.dart   ReadingProgress + AppThemeMode
 │   ├── models/quiz_session.dart  منطق تصحيح الاختبار (منفصل عن الواجهة)
 │   ├── repositories/          عقود المحتوى والتقدّم
 │   └── services/search_service.dart  فهرس وبحث دون اتصال
 ├── data/local/
-│   ├── asset_content_repository.dart   يقرأ أربعة ملفات JSON من الحزمة
+│   ├── asset_content_repository.dart   يقرأ خمسة ملفات JSON من الحزمة
 │   ├── prefs_progress_repository.dart  حفظ التقدّم في SharedPreferences
 │   └── memory_progress_repository.dart بديل للاختبارات
 └── presentation/
     ├── state/app_state.dart   ChangeNotifier واحد + AppScope (InheritedNotifier)
     ├── state/bootstrap.dart   تحميل المحتوى، شاشة بداية، شاشة خطأ
     ├── navigation/app_routes.dart
-    ├── screens/               13 شاشة + الهيكل العام (منها اختيار الصف)
-    └── widgets/               IllustrationFigure, TopicCard, unit_sections
+    ├── screens/               15 شاشة + الهيكل العام (منها اختيار الصف والموضوعات المصوّرة)
+    └── widgets/               IllustrationFigure, TopicCard, TopicDrawings,
+                               AssetViewer, GalleryTiles, unit_sections
 ```
 
 ## تدفّق الإقلاع
@@ -76,12 +77,15 @@ lib/
 
 ## المحتوى والبحث
 
-- `assets/content/{curriculum,lessons,glossary,plates}.json` — ناتج `tools/build_content.py`،
+- `assets/content/{curriculum,lessons,glossary,plates,drawings}.json` — ناتج `tools/build_content.py`،
   ومصدره الوحيد ملفات DOCX المرفقة. لا يُحرَّر يدوياً.
-- `Library` يوفّر: `unitsOf(section)`, `unitById`, `lessonById`, `termById`, `readingOrder`.
-- `SearchService` يبني الفهرس مرة واحدة عند الإقلاع (51 مدخلاً) من الوحدات والدروس والمصطلحات واللوحات،
-  ويُطبّع النص بـ `normalizeArabic` (توحيد الهمزات/الياء/التاء المربوطة، إزالة التشكيل والتطويل).
-  التسجيل: 10 لكل رمز مطابق + 25 إذا طابق العنوان + 15 إذا طابقت كل الرموز.
+- `Library` يوفّر: `unitsOf(section)`, `unitById`, `lessonById`, `termById`, `drawingById`,
+  `drawingsOfUnit`, `drawingsOfTopic`, `readingOrder`.
+- `TopicDrawing` هو رسم موضوع واحد: `id, order, title, asset, unitId, unitTitle, topicId, topicTitle,
+  grade, caption`. الربط بالموضوع هو ما يسمح بعرض الرسم في بداية موضوعه وفي المعرض حسب الموضوع.
+- `SearchService` يبني الفهرس مرة واحدة عند الإقلاع (66 مدخلاً) من الوحدات والدروس والمصطلحات واللوحات
+  ورسوم الموضوعات، ويُطبّع النص بـ `normalizeArabic` (توحيد الهمزات/الياء/التاء المربوطة، إزالة
+  التشكيل والتطويل). التسجيل: 10 لكل رمز مطابق + 25 إذا طابق العنوان + 15 إذا طابقت كل الرموز.
 - `snippetFor` يستخرج الجملة التي تحتوي الكلمة من النص الأصلي (دون تطبيع) لعرض مقتطف صحيح.
 
 ## الواجهة
@@ -100,6 +104,12 @@ lib/
 
 - **الرسوم**: `IllustrationFigure` يعرض SVG من الحزمة بحد أقصى للارتفاع، وخطاطيف `textDirection: rtl`،
   ومربّع حوار للتكبير، ووسيلة إيضاح ملوّنة من `legend` في JSON.
+- **رسوم الموضوعات**: `UnitSections` يستقبل `drawings` ويعرض `TopicDrawings` **قبل** بطاقة الموضوع في
+  القوالب الخمسة (مفهومي، مقارن، خامات، خطوات، زمني)، فيقف الرسم في بداية الموضوع الذي يخدمه.
+- **معرض الصور**: `GalleryTiles` + `groupByUnit` يجمعان لوحات الوحدات ورسوم الموضوعات تحت كل وحدة،
+  و`PlatesScreen` يعرضهما في قسمين داخل معرض واحد بدل قائمة مسطّحة.
+- **العرض المكبَّر**: `AssetViewer` هو الهيكل المشترك لعارض اللوحة وعارض رسم الموضوع (تكبير 0.8–5×،
+  شريط شرح، أزرار رجوع إلى الوحدة، وأزرار حجم الخط)، فلا تتكرر الواجهة في الشاشتين.
 - **المقاسات**: `AppLayout.pageMaxWidth = 1240`، `readingMaxWidth = 860`، `railBreakpoint = 940`.
 - **التنقّل بين الوحدات**: `_UnitSwitcher` في `unit_screen` شريط أفقي أسفل شريط التطبيق يعرض
   الوحدات الأربع للصف المختار (رقم الوحدة وعنوانها)، والانتقال يستبدل الشاشة (`pushReplacement`)
@@ -124,7 +134,9 @@ lib/
 | `quiz_screen` | أسئلة الوحدة مع تصحيح تلقائي وكشف الإجابات ونتيجة قابلة لإعادة المحاولة |
 | `lessons_screen` | فهرس الدروس التطبيقية الأربعة |
 | `lesson_screen` | درس تطبيقي واحد: العرض ثم الواجب البيتي |
-| `plates_screen` | معرض اللوحات المصوّرة |
+| `drawings_screen` | معرض الموضوعات المصوّرة الأربعة عشر (قسم مستقل)، مجمّع حسب الوحدة والموضوع |
+| `drawing_viewer_screen` | عرض رسم موضوع ملء الشاشة مع تكبير واسم الوحدة والموضوع |
+| `plates_screen` | معرض موحّد: لوحات الوحدات ورسوم الموضوعات، كلتاهما حسب الوحدة والموضوع |
 | `plate_viewer_screen` | عرض ملء الشاشة مع تكبير وسحب وإسناد الصفحة |
 | `glossary_screen` | المصطلحات وتعريفاتها وروابط وحداتها |
 | `search_screen` | بحث فوري مع تصفية بالنوع |

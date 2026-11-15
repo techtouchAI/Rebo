@@ -29,8 +29,15 @@ from contentlib import (  # noqa: E402
     normalize_ws,
     parse_malzama_docx,
     polish,
+    read_docx_media,
     read_docx_paragraphs_and_tables,
     read_docx_plain_text,
+)
+from drawings_content import (  # noqa: E402
+    DRAWINGS,
+    DRAWINGS_INTRO,
+    DRAWINGS_SUBTITLE,
+    DRAWINGS_TITLE,
 )
 from theatre_content import (  # noqa: E402
     THEATRE_INTRO,
@@ -41,8 +48,10 @@ from theatre_content import (  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 CONTENT_DIR = ROOT / "assets" / "content"
 PLATE_DIR = ROOT / "assets" / "images" / "plates"
+DRAWING_DIR = ROOT / "assets" / "images" / "drawings"
 MALZAMA_DOC = ROOT / "ملزمة_التربية_الفنية_بنموذج_إجابة_موحد.docx"
 INTRO_DOC = ROOT / "محتوى مكتمل" / "مقدمة.docx"
+DRAWINGS_DOC = ROOT / "التربية_الفنية_14_موضوعا_صورة_واحدة_لكل_موضوع.docx"
 
 PALETTE = {
     "primary": "#B4462F",
@@ -663,6 +672,55 @@ def build_theatre() -> dict:
     }
 
 
+# --------------------------------------------------------------- drawings ---
+
+def build_drawings(units: List[dict]) -> List[dict]:
+    """Extract the fourteen topic pictures and link each one to its topic.
+
+    The source document is a picture-only booklet (one page per topic), hence
+    the captions come from ``tools/drawings_content.py`` while the images are
+    copied byte for byte from the document, in document order.
+    """
+    if not DRAWINGS_DOC.exists():
+        raise SystemExit(f"missing drawings booklet: {DRAWINGS_DOC}")
+    media = read_docx_media(DRAWINGS_DOC)
+    if len(media) != len(DRAWINGS):
+        raise SystemExit(
+            f"{DRAWINGS_DOC.name}: expected {len(DRAWINGS)} pictures, found {len(media)}"
+        )
+
+    DRAWING_DIR.mkdir(parents=True, exist_ok=True)
+    for stale in DRAWING_DIR.glob("drawing-*.png"):
+        stale.unlink()
+
+    by_id = {unit["id"]: unit for unit in units}
+    drawings: List[dict] = []
+    for index, (spec, (_target, payload)) in enumerate(zip(DRAWINGS, media), start=1):
+        unit = by_id.get(spec["unitId"])
+        if unit is None:
+            raise SystemExit(f"drawing {index}: unknown unit {spec['unitId']}")
+        topic = next((t for t in unit["topics"] if t["id"] == spec["topicId"]), None)
+        if topic is None:
+            raise SystemExit(
+                f"drawing {index}: unknown topic {spec['topicId']} in {spec['unitId']}"
+            )
+        filename = f"drawing-{index:02d}.png"
+        (DRAWING_DIR / filename).write_bytes(payload)
+        drawings.append({
+            "id": f"drawing-{index:02d}",
+            "order": index,
+            "title": spec["title"],
+            "asset": f"assets/images/drawings/{filename}",
+            "unitId": unit["id"],
+            "unitTitle": unit["displayTitle"],
+            "topicId": topic["id"],
+            "topicTitle": topic["title"],
+            "grade": unit["grade"],
+            "caption": f"{unit['displayTitle']} — {topic['title']}",
+        })
+    return drawings
+
+
 # --------------------------------------------------------------- glossary ---
 
 def build_glossary(units: List[dict], intro: dict) -> List[dict]:
@@ -743,6 +801,7 @@ def main() -> None:
     intro = build_intro()
     theatre = build_theatre()
     lessons = build_lessons()
+    drawings = build_drawings(units)
     glossary = build_glossary(units, intro)
 
     sections = [
@@ -751,6 +810,7 @@ def main() -> None:
         {"id": "g2", "title": "الصف الثاني المتوسط", "subtitle": "ثلاث وحدات دراسية", "kind": "grade"},
         {"id": "g3", "title": "الصف الثالث المتوسط", "subtitle": "ثلاث وحدات دراسية", "kind": "grade"},
         {"id": "lessons", "title": "دروس تطبيقية", "subtitle": "خطط الحصص النظرية والعملية", "kind": "lessons"},
+        {"id": "drawings", "title": DRAWINGS_TITLE, "subtitle": DRAWINGS_SUBTITLE, "kind": "drawings"},
         {"id": "plates", "title": "اللوحات", "subtitle": "أعمال فنية وصور توضيحية", "kind": "plates"},
         {"id": "theatre", "title": "مفردات الأنشطة المسرحية", "subtitle": "موضوعات الأنشطة المسرحية للمرحلة المتوسطة", "kind": "theatre"},
     ]
@@ -773,11 +833,22 @@ def main() -> None:
     write_json(CONTENT_DIR / "lessons.json", apply_ocr_fixes({"schemaVersion": 1, "lessons": lessons}))
     write_json(CONTENT_DIR / "glossary.json", apply_ocr_fixes({"schemaVersion": 1, "terms": glossary}))
     write_json(CONTENT_DIR / "plates.json", apply_ocr_fixes({"schemaVersion": 1, "plates": plates}))
+    write_json(
+        CONTENT_DIR / "drawings.json",
+        apply_ocr_fixes({
+            "schemaVersion": 1,
+            "title": DRAWINGS_TITLE,
+            "subtitle": DRAWINGS_SUBTITLE,
+            "intro": DRAWINGS_INTRO,
+            "drawings": drawings,
+        }),
+    )
 
     topics = sum(len(unit["topics"]) for unit in curriculum["units"])
     questions = sum(len(unit["questions"]) for unit in curriculum["units"])
     print(f"units: {len(curriculum['units'])} (9 grade units + intro + theatre)")
     print(f"topics: {topics}  questions: {questions}  lessons: {len(lessons)}  plates: {len(plates)}")
+    print(f"drawings: {len(drawings)} (one picture per topic)")
 
 
 if __name__ == "__main__":

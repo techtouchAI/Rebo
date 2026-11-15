@@ -1,7 +1,7 @@
 import '../../core/utils/arabic_text.dart';
 import '../models/library.dart';
 
-enum SearchHitType { unit, lesson, term, plate }
+enum SearchHitType { unit, lesson, term, plate, drawing }
 
 /// A single search result, already prepared for display.
 class SearchHit {
@@ -29,6 +29,8 @@ class SearchHit {
         return 'مصطلح';
       case SearchHitType.plate:
         return 'لوحة';
+      case SearchHitType.drawing:
+        return 'رسمة موضوع';
     }
   }
 }
@@ -86,6 +88,19 @@ class SearchService {
         subtitle: unit?.displayTitle ?? 'مصطلح فني',
         haystack: normalizeArabic('${term.term} ${term.definition}'),
         text: term.definition,
+      ));
+    }
+    for (final drawing in library.drawings) {
+      if (unitFilter != null && !unitFilter!.contains(drawing.unitId)) {
+        continue;
+      }
+      _index.add(_IndexEntry(
+        type: SearchHitType.drawing,
+        id: drawing.id,
+        title: drawing.title,
+        subtitle: '${drawing.unitTitle} — ${drawing.topicTitle}',
+        haystack: normalizeArabic(drawing.searchableText),
+        text: '${drawing.title} — ${drawing.caption}',
       ));
     }
     for (final plate in library.plates) {

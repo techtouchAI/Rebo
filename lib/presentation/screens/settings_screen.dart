@@ -45,7 +45,8 @@ class SettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'المحتوى المعروض الآن: ${state.gradeTitle} فقط، مع المدخل العام والدروس واللوحات المشتركة.',
+                'المحتوى المعروض الآن: ${state.gradeTitle} فقط، مع المدخل العام والدروس '
+                'ورسوم الموضوعات واللوحات المشتركة.',
                 style: theme.textTheme.bodySmall,
               ),
             ],
@@ -185,7 +186,7 @@ class SettingsScreen extends StatelessWidget {
             children: <Widget>[
               Text(
                 'موضوعات التربية الفنية للمرحلة المتوسطة وأسئلتها ومصطلحاتها ولوحاتها، '
-                'والدروس التطبيقية ومفردات الأنشطة المسرحية.',
+                'ورسوم موضوعاتها، والدروس التطبيقية ومفردات الأنشطة المسرحية.',
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: AppSpacing.md),
@@ -197,6 +198,11 @@ class SettingsScreen extends StatelessWidget {
                     onPressed: () => AppRoutes.openGlossary(context),
                     icon: const Icon(Icons.translate, size: 18),
                     label: const Text('المصطلحات'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => AppRoutes.openDrawings(context),
+                    icon: const Icon(Icons.brush_outlined, size: 18),
+                    label: const Text('موضوعات مصوّرة'),
                   ),
                   OutlinedButton.icon(
                     onPressed: () => AppRoutes.openPlates(context),
@@ -218,6 +224,10 @@ class SettingsScreen extends StatelessWidget {
               _InfoRow(
                 label: 'الوحدات',
                 value: toArabicDigits('${state.visibleUnits.length}'),
+              ),
+              _InfoRow(
+                label: 'رسوم الموضوعات',
+                value: toArabicDigits('${state.visibleDrawings.length}'),
               ),
               _InfoRow(label: 'اللوحات', value: toArabicDigits('${state.visiblePlates.length}')),
               _InfoRow(label: 'الدروس التطبيقية', value: toArabicDigits('${state.library.lessons.length}')),

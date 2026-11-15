@@ -56,6 +56,41 @@ void main() {
     expect(theatre.any((hit) => hit.type == SearchHitType.plate), isFalse);
   });
 
+  test('finds the topic drawings of the booklet', () {
+    // Every unit, lesson, term, plate and topic drawing is indexed once.
+    expect(
+      search.indexSize,
+      library.units.length +
+          library.lessons.length +
+          library.glossary.length +
+          library.plates.length +
+          library.drawings.length,
+    );
+    final hits = search.search('التوزيع النجمي');
+    expect(hits.any((hit) => hit.type == SearchHitType.drawing), isTrue);
+    final drawing = hits.firstWhere((hit) => hit.type == SearchHitType.drawing);
+    expect(drawing.title.contains('بالتوزيع النجمي'), isTrue);
+    expect(drawing.subtitle.contains('قواعد التصميم الزخرفي'), isTrue);
+    expect(hits.any((hit) => hit.type == SearchHitType.plate), isFalse);
+  });
+
+  test('a grade filter keeps the drawings of the other grades out', () {
+    final filtered = SearchService(library, unitFilter: <String>{
+      for (final unit in library.unitsOf('g3')) unit.id,
+    });
+    final hits = filtered.search('الضوء والظل');
+    expect(hits.any((hit) => hit.type == SearchHitType.drawing), isTrue);
+    expect(
+      hits.where((hit) => hit.type == SearchHitType.drawing).every(
+            (hit) => library.drawings
+                .firstWhere((TopicDrawing drawing) => drawing.id == hit.id)
+                .unitId
+                .startsWith('g3'),
+          ),
+      isTrue,
+    );
+  });
+
   test('empty queries return nothing', () {
     expect(search.search('   '), isEmpty);
     expect(search.search(''), isEmpty);

@@ -121,6 +121,49 @@ void main() {
       }
     });
 
+    test('the fourteen topic drawings are attached to their curriculum topics', () {
+      expect(library.drawings.length, 14);
+      final ids = <String>{};
+      for (final drawing in library.drawings) {
+        expect(ids.add(drawing.id), isTrue, reason: 'duplicate drawing id ${drawing.id}');
+        expect(drawing.title.trim(), isNotEmpty, reason: drawing.id);
+        expect(drawing.order, greaterThan(0), reason: drawing.id);
+        expect(drawing.asset.startsWith('assets/images/drawings/'), isTrue, reason: drawing.id);
+        final LearningUnit? linkedUnit = library.unitById(drawing.unitId);
+        expect(linkedUnit, isNotNull, reason: '${drawing.id} points to an unknown unit');
+        final unit = linkedUnit!;
+        expect(
+          unit.topics.any((Topic topic) => topic.id == drawing.topicId),
+          isTrue,
+          reason: '${drawing.id} points to an unknown topic',
+        );
+        expect(drawing.topicTitle, isNotEmpty, reason: drawing.id);
+        expect(drawing.caption, contains(drawing.topicTitle), reason: drawing.id);
+        expect(drawing.grade, unit.grade, reason: drawing.id);
+        final file = File(drawing.asset);
+        expect(file.existsSync(), isTrue, reason: 'missing drawing ${drawing.asset}');
+        expect(file.lengthSync(), greaterThan(50 * 1024), reason: '${drawing.asset} is too small');
+        expect(file.lengthSync(), lessThan(1024 * 1024), reason: '${drawing.asset} is too large');
+      }
+      // A topic may carry several pages of the source booklet.
+      expect(library.drawingsOfTopic('g1-u2', 't2').length, 3);
+      expect(library.drawingsOfUnit('g2-u2').length, 4);
+      final illustrated = library.units
+          .where((LearningUnit unit) => library.drawingsOfUnit(unit.id).isNotEmpty)
+          .length;
+      expect(illustrated, greaterThanOrEqualTo(5));
+      expect(library.sections.any((ContentSection section) => section.kind == 'drawings'), isTrue);
+    });
+
+    test('every drawing of the booklet stays a section of its own', () {
+      final section = library.sections.firstWhere(
+        (ContentSection item) => item.kind == 'drawings',
+      );
+      expect(section.title.trim(), isNotEmpty);
+      expect(library.units.any((LearningUnit unit) => unit.sectionId == 'drawings'), isFalse);
+      expect(library.plates.any((Plate plate) => plate.id.startsWith('drawing')), isFalse);
+    });
+
     test('the theatre theme is a section of its own, not a plate', () {
       final theatre = library.units.firstWhere((LearningUnit unit) => unit.isTheatre);
       expect(theatre.topics.length, greaterThanOrEqualTo(5));
@@ -170,6 +213,7 @@ void main() {
         for (final lesson in library.lessons)
           for (final figure in lesson.figures) figure.asset,
         for (final plate in library.plates) plate.asset,
+        for (final drawing in library.drawings) drawing.asset,
         for (final unit in library.units)
           for (final plate in unit.plates) plate.asset,
       };

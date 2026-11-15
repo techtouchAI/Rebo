@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mirsam/presentation/screens/drawing_viewer_screen.dart';
+import 'package:mirsam/presentation/screens/drawings_screen.dart';
 import 'package:mirsam/presentation/screens/favorites_screen.dart';
 import 'package:mirsam/presentation/screens/glossary_screen.dart';
 import 'package:mirsam/presentation/screens/grade_picker_screen.dart';
@@ -63,6 +65,18 @@ void main() {
 
   testWidgets('plates gallery fits a phone', (WidgetTester tester) async {
     await expectFitsPhone(tester, const PlatesScreen(), 'plates');
+  });
+
+  testWidgets('drawings gallery fits a phone', (WidgetTester tester) async {
+    await expectFitsPhone(tester, const DrawingsScreen(), 'drawings');
+  });
+
+  testWidgets('drawing viewer fits a phone', (WidgetTester tester) async {
+    await expectFitsPhone(
+      tester,
+      const DrawingViewerScreen(drawingId: 'drawing-01'),
+      'drawing viewer',
+    );
   });
 
   testWidgets('plate viewer fits a phone', (WidgetTester tester) async {

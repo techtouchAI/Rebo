@@ -34,6 +34,12 @@
       "kind": "lessons"
     },
     {
+      "id": "drawings",
+      "title": "موضوعات مصوّرة",
+      "subtitle": "صورة واحدة لكل موضوع من موضوعات الرسم",
+      "kind": "drawings"
+    },
+    {
       "id": "plates",
       "title": "اللوحات",
       "subtitle": "أعمال فنية وصور توضيحية",

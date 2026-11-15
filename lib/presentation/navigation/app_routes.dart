@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/models/library.dart';
+import '../screens/drawings_screen.dart';
+import '../screens/drawing_viewer_screen.dart';
 import '../screens/favorites_screen.dart';
 import '../screens/glossary_screen.dart';
 import '../screens/lesson_screen.dart';
@@ -40,6 +42,28 @@ abstract final class AppRoutes {
   static Future<void> openPlates(BuildContext context) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (BuildContext context) => const PlatesScreen()),
+    );
+  }
+
+  static Future<void> openDrawings(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (BuildContext context) => const DrawingsScreen()),
+    );
+  }
+
+  static Future<void> openDrawing(BuildContext context, TopicDrawing drawing) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => DrawingViewerScreen(drawingId: drawing.id),
+      ),
+    );
+  }
+
+  static Future<void> openDrawingById(BuildContext context, String drawingId) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => DrawingViewerScreen(drawingId: drawingId),
+      ),
     );
   }
 

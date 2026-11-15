@@ -16,6 +16,7 @@ class AssetContentRepository implements ContentRepository {
   static const String lessonsPath = 'assets/content/lessons.json';
   static const String glossaryPath = 'assets/content/glossary.json';
   static const String platesPath = 'assets/content/plates.json';
+  static const String drawingsPath = 'assets/content/drawings.json';
 
   static Future<String> _loadFromBundle(String path) => rootBundle.loadString(path);
 
@@ -26,12 +27,14 @@ class AssetContentRepository implements ContentRepository {
       loader(lessonsPath),
       loader(glossaryPath),
       loader(platesPath),
+      loader(drawingsPath),
     ]);
     return Library.fromJson(
       jsonDecode(results[0]) as Map<String, dynamic>,
       jsonDecode(results[1]) as Map<String, dynamic>,
       jsonDecode(results[2]) as Map<String, dynamic>,
       jsonDecode(results[3]) as Map<String, dynamic>,
+      jsonDecode(results[4]) as Map<String, dynamic>,
     );
   }
 }

@@ -150,6 +150,7 @@ jobs:
             assets/content/lessons.json \
             assets/content/glossary.json \
             assets/content/plates.json \
+            assets/content/drawings.json \
             assets/fonts/Almarai-Regular.ttf \
             assets/fonts/Cairo-Regular.ttf \
             assets/fonts/Tajawal-Regular.ttf \
@@ -158,7 +159,9 @@ jobs:
             assets/illustrations/studio.svg \
             assets/illustrations/perspective.svg \
             assets/images/plates/plate-01.jpg \
-            assets/images/plates/plate-10.jpg ; do
+            assets/images/plates/plate-10.jpg \
+            assets/images/drawings/drawing-01.png \
+            assets/images/drawings/drawing-14.png ; do
             if ! unzip -l "$APK" | grep -q "flutter_assets/$asset"; then
               echo "::error::the APK is missing $asset"
               exit 1
@@ -336,7 +339,10 @@ jobs:
             'data\flutter_assets\assets\content\curriculum.json',
             'data\flutter_assets\assets\fonts\Almarai-Regular.ttf',
             'data\flutter_assets\assets\illustrations\studio.svg',
-            'data\flutter_assets\assets\images\plates\plate-01.jpg'
+            'data\flutter_assets\assets\images\plates\plate-01.jpg',
+            'data\flutter_assets\assets\content\drawings.json',
+            'data\flutter_assets\assets\images\drawings\drawing-01.png',
+            'data\flutter_assets\assets\images\drawings\drawing-14.png'
           )
           foreach ($item in $required) {
             if ($entries -notcontains $item) {
