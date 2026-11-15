@@ -9,6 +9,7 @@ import '../screens/lesson_screen.dart';
 import '../screens/lessons_screen.dart';
 import '../screens/plate_viewer_screen.dart';
 import '../screens/plates_screen.dart';
+import '../screens/question_print_screen.dart';
 import '../screens/quiz_screen.dart';
 import '../screens/search_screen.dart';
 import '../screens/unit_screen.dart';
@@ -24,6 +25,12 @@ abstract final class AppRoutes {
   static Future<void> openQuiz(BuildContext context, LearningUnit unit) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (BuildContext context) => QuizScreen(unitId: unit.id)),
+    );
+  }
+
+  static Future<void> openQuestionPrinting(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (BuildContext context) => const QuestionPrintScreen()),
     );
   }
 
