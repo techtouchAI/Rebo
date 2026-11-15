@@ -272,21 +272,7 @@ class _PrintIntro extends StatelessWidget {
 
 /// Accept Western, Arabic-Indic, and Eastern Arabic-Indic digits from either
 /// mobile or desktop keyboards without depending on the current locale.
-int? _parseFontSize(String text) {
-  final digits = StringBuffer();
-  for (final rune in text.runes) {
-    if (rune >= 0x30 && rune <= 0x39) {
-      digits.writeCharCode(rune);
-    } else if (rune >= 0x660 && rune <= 0x669) {
-      digits.write(rune - 0x660);
-    } else if (rune >= 0x6f0 && rune <= 0x6f9) {
-      digits.write(rune - 0x6f0);
-    } else {
-      return null;
-    }
-  }
-  return int.tryParse(digits.toString());
-}
+int? _parseFontSize(String text) => parseIntegerDigits(text);
 
 class _PrintSettings extends StatelessWidget {
   const _PrintSettings({

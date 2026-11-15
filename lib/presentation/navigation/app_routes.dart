@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../domain/models/library.dart';
 import '../screens/drawings_screen.dart';
 import '../screens/drawing_viewer_screen.dart';
+import '../screens/exam_composer_screen.dart';
 import '../screens/favorites_screen.dart';
 import '../screens/glossary_screen.dart';
 import '../screens/lesson_screen.dart';
@@ -25,6 +26,12 @@ abstract final class AppRoutes {
   static Future<void> openQuiz(BuildContext context, LearningUnit unit) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (BuildContext context) => QuizScreen(unitId: unit.id)),
+    );
+  }
+
+  static Future<void> openExamComposer(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (BuildContext context) => const ExamComposerScreen()),
     );
   }
 

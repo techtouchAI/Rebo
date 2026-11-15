@@ -111,3 +111,22 @@ String readingTimeLabel(String text) {
   final safeMinutes = minutes < 1 ? 1 : minutes;
   return '${toArabicDigits('$safeMinutes')} د قراءة';
 }
+
+/// Parses a whole number typed with Western, Arabic-Indic or Eastern
+/// Arabic-Indic digits. Returns null for empty or mixed input, which keeps the
+/// numeric form fields strict on phones and on Windows.
+int? parseIntegerDigits(String text) {
+  final digits = StringBuffer();
+  for (final rune in text.runes) {
+    if (rune >= 0x30 && rune <= 0x39) {
+      digits.writeCharCode(rune);
+    } else if (rune >= 0x660 && rune <= 0x669) {
+      digits.write(rune - 0x660);
+    } else if (rune >= 0x6f0 && rune <= 0x6f9) {
+      digits.write(rune - 0x6f0);
+    } else {
+      return null;
+    }
+  }
+  return int.tryParse(digits.toString());
+}

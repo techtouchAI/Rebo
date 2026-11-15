@@ -480,6 +480,7 @@ class _ShortcutsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <_Shortcut>[
+      _Shortcut('كتابة الأسئلة', Icons.note_add_outlined, () => AppRoutes.openExamComposer(context)),
       _Shortcut('المصطلحات الفنية', Icons.translate_outlined, () => AppRoutes.openGlossary(context)),
       _Shortcut('المفضلة', Icons.bookmark_border, () => AppRoutes.openFavorites(context)),
       _Shortcut('دروس تطبيقية', Icons.edit_note_outlined, () => AppRoutes.openLessons(context)),
