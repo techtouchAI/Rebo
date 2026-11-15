@@ -13,6 +13,7 @@ import '../../domain/models/library.dart';
 import '../navigation/app_routes.dart';
 import '../state/app_state.dart';
 import '../widgets/illustration_figure.dart';
+import '../widgets/unit_switcher_bar.dart';
 import '../widgets/units/unit_sections.dart';
 import '../widgets/text_scale_controls.dart';
 
@@ -97,7 +98,7 @@ class _UnitScreenState extends State<UnitScreen> {
         bottom: siblings.length > 1
             ? PreferredSize(
                 preferredSize: const Size.fromHeight(56),
-                child: _UnitSwitcher(
+                child: UnitSwitcherBar(
                   units: siblings,
                   current: unit,
                   accent: accent,
@@ -604,73 +605,6 @@ class _NavCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Horizontal switcher between the four units of the grade, placed right under
-/// the app bar so the learner can jump between units without going back to the
-/// index.
-class _UnitSwitcher extends StatelessWidget {
-  const _UnitSwitcher({
-    required this.units,
-    required this.current,
-    required this.accent,
-    required this.onSelected,
-  });
-
-  final List<LearningUnit> units;
-  final LearningUnit current;
-  final Color accent;
-  final ValueChanged<LearningUnit> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return SizedBox(
-      height: 56,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 8),
-        itemCount: units.length,
-        separatorBuilder: (BuildContext context, int index) =>
-            const SizedBox(width: AppSpacing.xs),
-        itemBuilder: (BuildContext context, int index) {
-          final unit = units[index];
-          final selected = unit.id == current.id;
-          return Semantics(
-            selected: selected,
-            button: true,
-            child: Material(
-              color: selected ? accent.withValues(alpha: 0.16) : scheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(30),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(30),
-                onTap: () => onSelected(unit),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
-                      color: selected ? accent : scheme.outlineVariant,
-                    ),
-                  ),
-                  child: Text(
-                    '${toArabicDigits('${unit.order}')}. ${unit.displayTitle}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: selected ? accent : scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
       ),
     );
   }

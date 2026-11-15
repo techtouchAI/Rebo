@@ -17,8 +17,8 @@ from pathlib import Path
 import docx
 
 sys.path.insert(0, str(Path(__file__).parent))
-import build_content  # noqa: E402
 from contentlib import canon, docx_text, parse_questions, parse_topics, polish  # noqa: E402
+from theatre_content import THEATRE_TOPICS  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTENT = ROOT / "assets" / "content"
@@ -200,7 +200,7 @@ def main() -> int:
     # ships in the builder and rejects any later drift.
     expect(
         [topic["title"] for topic in theatre_unit["topics"]]
-        == [topic["title"] for topic in build_content.THEATRE_TOPICS],
+        == [topic["title"] for topic in THEATRE_TOPICS],
         "the theatre topics left their transcribed source",
     )
     for topic in theatre_unit["topics"]:

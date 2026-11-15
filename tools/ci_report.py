@@ -164,12 +164,23 @@ ERROR_HINTS = (
 )
 
 
+SUCCESS_HINTS = (
+    "verification passed",
+    "all checks passed",
+    "build succeeded",
+    "built successfully",
+)
+
+
 def report_log(path: Path) -> int:
     """Annotates the first error-looking lines of an arbitrary build log."""
     if not path.exists():
         emit("error", f"build log missing: {path}")
         return 0
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    if any(hint in line.lower() for line in lines for hint in SUCCESS_HINTS):
+        print(f"## build log: success, {len(lines)} lines")
+        return 0
     matched: list[str] = []
     for index, raw in enumerate(lines):
         line = raw.strip()

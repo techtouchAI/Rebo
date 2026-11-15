@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mirsam/core/utils/arabic_text.dart';
 import 'package:mirsam/domain/models/library.dart';
 import 'package:mirsam/domain/models/progress.dart';
 import 'package:mirsam/presentation/screens/grade_picker_screen.dart';
@@ -11,6 +12,7 @@ import 'package:mirsam/presentation/screens/lesson_screen.dart';
 import 'package:mirsam/presentation/screens/quiz_screen.dart';
 import 'package:mirsam/presentation/screens/search_screen.dart';
 import 'package:mirsam/presentation/screens/unit_screen.dart';
+import 'package:mirsam/presentation/widgets/unit_switcher_bar.dart';
 
 import 'overflow_utils.dart';
 import 'test_support.dart';
@@ -33,24 +35,49 @@ void main() {
     expect(directionality.textDirection, TextDirection.rtl);
   });
 
-  testWidgets('the unit reader offers a switcher for the four units', (WidgetTester tester) async {
-    await pumpScreen(tester, const UnitScreen(unitId: 'g1-u2'), size: const Size(900, 1200));
+  testWidgets('the unit reader switches between the four units of the grade',
+      (WidgetTester tester) async {
+    await pumpScreen(
+      tester,
+      const UnitScreen(unitId: 'g1-u2'),
+      size: const Size(900, 1400),
+    );
 
-    // The switcher shows every unit of the grade, numbered.
-    for (final String unit in <String>[
-      'التعبير الفني',
-      'التصميم والزخرفة',
-      'التشكيل الفني والهندسي',
-      'التذوق وتاريخ الفن',
-    ]) {
-      expect(find.textContaining(unit), findsWidgets, reason: unit);
+    // The bar lists every unit of the grade, numbered, current one included.
+    final bar = find.byType(UnitSwitcherBar);
+    expect(bar, findsOneWidget);
+    expect(find.descendant(of: bar, matching: find.byType(InkWell)), findsNWidgets(4));
+
+    final labels = <String>[
+      '${toArabicDigits('1')}. التعبير الفني',
+      '${toArabicDigits('2')}. التصميم والزخرفة',
+      '${toArabicDigits('3')}. التشكيل الفني والهندسي',
+      '${toArabicDigits('4')}. التذوق الفني وتاريخ الفن',
+    ];
+    for (final String label in labels) {
+      expect(
+        find.descendant(of: bar, matching: find.text(label)),
+        findsOneWidget,
+        reason: label,
+      );
     }
-    await tester.tap(find.textContaining('التذوق وتاريخ الفن').first);
+
+    final target = find.descendant(of: bar, matching: find.text(labels.last));
+    // The bar scrolls horizontally, so the last chip may sit off-screen.
+    await tester.ensureVisible(target);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(target);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.byType(UnitScreen), findsOneWidget);
-    expect(find.textContaining('الوحدة الرابعة: التذوق وتاريخ الفن'), findsWidgets);
+    expect(find.textContaining('التذوق الفني وتاريخ الفن'), findsWidgets);
+    final newBar = find.byType(UnitSwitcherBar);
+    expect(find.descendant(of: newBar, matching: find.byType(InkWell)), findsNWidgets(4));
+    expect(
+      find.descendant(of: newBar, matching: find.text(labels.last)),
+      findsOneWidget,
+    );
   });
 
   testWidgets('the settings page switches the reading font', (WidgetTester tester) async {
