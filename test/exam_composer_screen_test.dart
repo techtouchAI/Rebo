@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mirsam/data/local/exam_document_exporter.dart';
 import 'package:mirsam/data/local/memory_exam_profile_repository.dart';
 import 'package:mirsam/data/local/memory_exam_question_bank_repository.dart';
-import 'package:mirsam/domain/models/exam_question_bank.dart';
 import 'package:mirsam/domain/models/exam_paper.dart';
 import 'package:mirsam/domain/models/library.dart';
 import 'package:mirsam/domain/repositories/exam_profile_repository.dart';
