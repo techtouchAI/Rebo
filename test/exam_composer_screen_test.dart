@@ -371,7 +371,8 @@ void main() {
     // needs one more frame than tapKey provides.
     await tapKey(tester, 'exam-open-bank');
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('لا توجد مجموعات محفوظة بعد.'), findsOneWidget);
+    // Nothing to restore: no dialog is opened and nothing is written.
+    expect(find.text('المجموعات المحفوظة'), findsNothing);
     expect(bank.saveCount, 0);
 
     await tapKey(tester, 'exam-next');
@@ -390,7 +391,10 @@ void main() {
       bank.entries.single.selection['trueFalse'],
       contains(questions.trueFalse.id),
     );
-    expect(find.textContaining('حُفظت المجموعة'), findsOneWidget);
+    // The stored entry carries the marks and captions too.
+    expect(bank.entries.single.theoryDegree, 30);
+    expect(bank.entries.single.practicalDegree, 70);
+    expect(bank.entries.single.theoryHeader, ExamPaper.defaultTheoryHeader);
 
     // A second start from the stored bank restores that selection; pumping a
     // new screen replaces the previous tree entirely.
