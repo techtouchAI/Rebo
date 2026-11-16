@@ -367,18 +367,22 @@ void main() {
     final state = await pumpComposer(tester, bank: bank);
     final questions = firstQuestions(state);
 
-    // Nothing saved yet.
+    // Nothing saved yet. Opening the bank awaits the store, so the snack bar
+    // needs one more frame than tapKey provides.
     await tapKey(tester, 'exam-open-bank');
+    await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('لا توجد مجموعات محفوظة بعد.'), findsOneWidget);
     expect(bank.saveCount, 0);
 
     await tapKey(tester, 'exam-next');
     await tapKey(tester, 'exam-next');
     await tapKey(tester, 'exam-item-${questions.trueFalse.id}');
-    await tapKey(tester, 'exam-save-group');
+    await tester.ensureVisible(key('exam-save-group'));
+    await tester.pump();
+    await tester.tap(key('exam-save-group'));
     // The save is asynchronous and reports through a snack bar.
-    await tester.pumpAndSettle();
-    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
     expect(bank.saveCount, 1);
     expect(bank.entries, hasLength(1));

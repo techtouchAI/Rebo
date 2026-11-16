@@ -328,7 +328,8 @@ void main() {
         theoryHeader: 'المادة النظرية / اجب عن سؤالين فقط',
         practicalHeader: 'المادة العملية : اجب عن سؤالين فقط',
       );
-      expect(paper.theoryPerQuestionDegree, 10); // 30 / 3 questions
+      // 30 marks over the two questions the heading asks for.
+      expect(paper.theoryPerQuestionDegree, 15);
       final uneven = paper.copyWith(theoryDegree: 31);
       expect(uneven.theoryPerQuestionDegree, isNull);
       expect(uneven.theoryHeadingLine, isNot(contains('لكل سؤال')));
@@ -382,7 +383,9 @@ void main() {
       expect(repaired.selection, isEmpty);
       expect(repaired.practicalPrompts, <String>['نص']);
       expect(repaired.theoryHeader, ExamPaper.defaultTheoryHeader);
-      expect(repaired.isEmpty, isTrue);
+      // The stored prompt still counts, so the rescued entry is not empty.
+      expect(repaired.isEmpty, isFalse);
+      expect(repaired.itemCount, 1);
     });
 
     test('exported selection becomes a restorable entry', () async {
