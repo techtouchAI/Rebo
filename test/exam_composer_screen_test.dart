@@ -6,6 +6,7 @@ import 'package:mirsam/data/local/exam_document_exporter.dart';
 import 'package:mirsam/data/local/memory_exam_profile_repository.dart';
 import 'package:mirsam/data/local/memory_exam_question_bank_repository.dart';
 import 'package:mirsam/domain/models/exam_paper.dart';
+import 'package:mirsam/domain/models/exam_question_bank.dart';
 import 'package:mirsam/domain/models/library.dart';
 import 'package:mirsam/domain/repositories/exam_profile_repository.dart';
 import 'package:mirsam/domain/services/exam_paper_formatter.dart';
@@ -396,21 +397,40 @@ void main() {
     expect(bank.entries.single.practicalDegree, 70);
     expect(bank.entries.single.theoryHeader, ExamPaper.defaultTheoryHeader);
 
-    // A second start from the stored bank restores that selection; pumping a
-    // new screen replaces the previous tree entirely.
-    final reopening = MemoryExamQuestionBankRepository(bank.entries);
-    await pumpComposer(tester, bank: reopening);
+  });
+
+  testWidgets('restores a stored group into a fresh composer', (tester) async {
+    // A bank that already holds one saved group, as after a previous session.
+    final library = await ensureLibrary();
+    final stored = ExamQuestionBankEntry(
+      id: 'stored-1',
+      title: 'نصف السنة • ٣ أسئلة',
+      savedAt: DateTime(2026, 1, 15),
+      selection: <String, List<String>>{
+        'trueFalse': <String>[
+          examQuestionOptions(library.unitsOf(testGrade))
+              .firstWhere((ExamQuestionOption option) =>
+                  option.question.kind == QuestionKind.trueFalse)
+              .id,
+        ],
+      },
+    );
+    final bank = MemoryExamQuestionBankRepository(<ExamQuestionBankEntry>[stored]);
+    await pumpComposer(tester, bank: bank);
+
     await tapKey(tester, 'exam-open-bank');
     await tester.pumpAndSettle();
     expect(find.text('المجموعات المحفوظة'), findsOneWidget);
-    await tester.tap(find.byKey(ValueKey<String>('exam-bank-entry-${bank.entries.single.id}')));
+    await tester.tap(find.byKey(const ValueKey<String>('exam-bank-entry-stored-1')));
     await tester.pumpAndSettle();
 
     await tapKey(tester, 'exam-next');
     await tapKey(tester, 'exam-next');
+    final id = stored.selection['trueFalse']!.single;
     expect(
-      tester.widget<CheckboxListTile>(key('exam-item-${questions.trueFalse.id}')).value,
+      tester.widget<CheckboxListTile>(key('exam-item-$id')).value,
       isTrue,
+      reason: 'the restored group must come back selected',
     );
   });
 
