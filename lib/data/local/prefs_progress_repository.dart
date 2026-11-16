@@ -19,7 +19,15 @@ class PrefsProgressRepository implements ProgressRepository {
       return ReadingProgress();
     }
     try {
-      return ReadingProgress.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      final progress = ReadingProgress.fromJson(decoded);
+      // A document migrated from an older version is written back once, so the
+      // migration never runs twice and the new size is stable.
+      final savedVersion = (decoded['version'] as num?)?.toInt() ?? 0;
+      if (savedVersion < readingProgressVersion) {
+        await prefs.setString(storageKey, jsonEncode(progress.toJson()));
+      }
+      return progress;
     } on FormatException {
       return ReadingProgress();
     }
