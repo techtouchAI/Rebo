@@ -82,8 +82,10 @@ class ExamQuestionBankEntry {
       }
     }
     return ExamQuestionBankEntry(
-      id: json['id'] as String? ?? '',
-      title: json['title'] as String? ?? '',
+      // A hand-edited or older document may carry a number here; the entry is
+      // still usable, so the value is read leniently instead of throwing.
+      id: _stringOf(json['id']),
+      title: _stringOf(json['title']),
       savedAt: DateTime.tryParse('${json['savedAt'] ?? ''}') ?? DateTime.now(),
       selection: selection,
       practicalPrompts: <String>[
@@ -92,8 +94,16 @@ class ExamQuestionBankEntry {
       ],
       theoryDegree: (json['theoryDegree'] as num?)?.toInt() ?? defaultTheoryDegree,
       practicalDegree: (json['practicalDegree'] as num?)?.toInt() ?? defaultPracticalDegree,
-      theoryHeader: json['theoryHeader'] as String? ?? ExamPaper.defaultTheoryHeader,
-      practicalHeader: json['practicalHeader'] as String? ?? ExamPaper.defaultPracticalHeader,
+      theoryHeader: _stringOf(json['theoryHeader'], ExamPaper.defaultTheoryHeader),
+      practicalHeader: _stringOf(json['practicalHeader'], ExamPaper.defaultPracticalHeader),
     );
+  }
+
+  static String _stringOf(Object? value, [String fallback = '']) {
+    if (value == null) {
+      return fallback;
+    }
+    final text = value is String ? value : '$value';
+    return text.trim().isEmpty && fallback.isNotEmpty ? fallback : text;
   }
 }

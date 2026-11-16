@@ -136,10 +136,9 @@ class ExamComposerState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Restores the official spacing with one tap; the slider calls this when the
-  /// teacher wants the source layout back.
+  /// Restores the official spacing (100 %) with one tap.
   void resetLineSpacing() =>
-      setLineSpacingPercent(ExamPaperTypography.defaultLineSpacingPercent);
+      setLineSpacingPercent(ExamPaperTypography.officialLineSpacingPercent);
 
   // ------------------------------------------------------------------ info ---
 

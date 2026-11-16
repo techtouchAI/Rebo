@@ -198,13 +198,13 @@ void main() {
       },
     );
 
-    // The project starts from a tightened 55 %; restoring means 100 %.
+    // The project starts from a tightened 55 %; restoring means the official
+    // 100 %, so the button is already usable.
     expect(key('exam-spacing-label'), findsOneWidget);
     expect(tester.widget<Slider>(key('exam-line-spacing-slider')).value, 55);
-    // Restoring is pointless while the value is already the default.
     expect(
       tester.widget<TextButton>(key('exam-line-spacing-reset')).onPressed,
-      isNull,
+      isNotNull,
     );
 
     await tester.enterText(key('exam-line-spacing'), '70');
@@ -224,6 +224,11 @@ void main() {
     await tapKey(tester, 'exam-line-spacing-reset');
     expect(fieldText(tester, 'exam-line-spacing'), '100');
     expect(tester.widget<Slider>(key('exam-line-spacing-slider')).value, 100);
+    // Nothing left to restore.
+    expect(
+      tester.widget<TextButton>(key('exam-line-spacing-reset')).onPressed,
+      isNull,
+    );
 
     // 70 % must reach the exported document: 360 * 0.7 = 252 twips.
     await tester.enterText(key('exam-line-spacing'), '70');
@@ -371,7 +376,9 @@ void main() {
     await tapKey(tester, 'exam-next');
     await tapKey(tester, 'exam-item-${questions.trueFalse.id}');
     await tapKey(tester, 'exam-save-group');
+    // The save is asynchronous and reports through a snack bar.
     await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(bank.saveCount, 1);
     expect(bank.entries, hasLength(1));

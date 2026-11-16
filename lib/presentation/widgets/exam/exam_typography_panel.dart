@@ -157,11 +157,11 @@ class ExamTypographyPanel extends StatelessWidget {
             child: TextButton.icon(
               key: const ValueKey<String>('exam-line-spacing-reset'),
               onPressed: state.lineSpacingPercent ==
-                      ExamPaperTypography.defaultLineSpacingPercent
+                      ExamPaperTypography.officialLineSpacingPercent
                   ? null
                   : () {
                       controllers.lineSpacing.text =
-                          '${ExamPaperTypography.defaultLineSpacingPercent}';
+                          '${ExamPaperTypography.officialLineSpacingPercent}';
                       state.resetLineSpacing();
                     },
               icon: const Icon(Icons.restart_alt, size: 18),

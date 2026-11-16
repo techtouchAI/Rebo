@@ -55,9 +55,11 @@ class ExamPaperTypography {
   static const int minFontSize = 8;
   static const int maxFontSize = 32;
 
-  /// Line spacing as a percentage of the default. The project starts from a
-  /// tightened 55 % so a full paper fits the page; 100 % restores the official
-  /// spacing of the source document.
+  /// The spacing of the source document, used by the restore button.
+  static const int officialLineSpacingPercent = 100;
+
+  /// Line spacing as a percentage of the official one. The project starts from
+  /// a tightened 55 % so a full paper fits the page.
   static const int defaultLineSpacingPercent = 55;
   static const int minLineSpacingPercent = 50;
   static const int maxLineSpacingPercent = 200;
@@ -94,9 +96,9 @@ class ExamPaperTypography {
   /// The `w:line` of the tightened or widened text, in 240ths of a line.
   int get lineTwips => (baseLineTwips * lineSpacingPercent / 100).round();
 
-  /// True when the user kept the default spacing, so the document matches the
-  /// official paper exactly.
-  bool get usesDefaultLineSpacing => lineSpacingPercent == defaultLineSpacingPercent;
+  /// True when the document matches the spacing of the source paper.
+  bool get usesDefaultLineSpacing =>
+      lineSpacingPercent == officialLineSpacingPercent;
 
   /// The separator lines are drawn two points above the section titles, as in
   /// the official paper.
@@ -387,17 +389,23 @@ class ExamPaper {
       ? defaultTheoryHeader
       : theoryHeader.trim();
 
+  /// How many theoretical questions the paper asks for. The heading says
+  /// `اجب عن سؤالين فقط`, so the total is split between two questions whatever
+  /// number of question groups the teacher filled.
+  static const int askedTheoryQuestionCount = 2;
+
   /// Degree of every theoretical question; null when the total cannot be split
   /// evenly between the two questions the paper asks for.
   int? get theoryPerQuestionDegree {
-    if (theoryQuestionCount <= 0) {
+    if (theoryDegree <= 0) {
       return null;
     }
-    final split = theoryDegree ~/ theoryQuestionCount;
-    return theoryDegree % theoryQuestionCount == 0 ? split : null;
+    final split = theoryDegree ~/ askedTheoryQuestionCount;
+    return theoryDegree % askedTheoryQuestionCount == 0 ? split : null;
   }
 
-  /// Number of theoretical questions actually written, not the number of items.
+  /// Number of theoretical question groups actually written, not the number of
+  /// items: the paper prints one heading per group.
   int get theoryQuestionCount => theory.length;
 
   /// The practical heading as printed, e.g. `المادة العملية : اجب عن سؤالين فقط ( 70 درجة )`.

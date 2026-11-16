@@ -218,12 +218,15 @@ void main() {
       const typography = ExamPaperTypography();
       expect(typography.lineSpacingPercent, 55);
       expect(typography.lineTwips, 198);
-      expect(typography.usesDefaultLineSpacing, isTrue);
+      // The project starts tightened, so it is not the source layout.
+      expect(typography.usesDefaultLineSpacing, isFalse);
 
-      const official = ExamPaperTypography(lineSpacingPercent: 100);
+      const official = ExamPaperTypography(
+        lineSpacingPercent: ExamPaperTypography.officialLineSpacingPercent,
+      );
       expect(official.lineTwips, ExamPaperTypography.baseLineTwips);
       expect(official.lineTwips, 360);
-      expect(official.usesDefaultLineSpacing, isFalse);
+      expect(official.usesDefaultLineSpacing, isTrue);
     });
 
     test('tightens and widens the spacing proportionally', () {
@@ -286,7 +289,7 @@ void main() {
       expect(state.typography, isNotNull);
       expect(
         state.typography!.lineSpacingPercent,
-        ExamPaperTypography.defaultLineSpacingPercent,
+        ExamPaperTypography.officialLineSpacingPercent,
       );
     });
   });
@@ -370,9 +373,12 @@ void main() {
     test('survives a corrupt or partial document', () {
       final repaired = ExamQuestionBankEntry.fromJson(<String, dynamic>{
         'id': 42,
+        'title': 7,
         'selection': 'not-a-map',
         'practicalPrompts': <dynamic>[1, 'نص'],
       });
+      expect(repaired.id, '42');
+      expect(repaired.title, '7');
       expect(repaired.selection, isEmpty);
       expect(repaired.practicalPrompts, <String>['نص']);
       expect(repaired.theoryHeader, ExamPaper.defaultTheoryHeader);
