@@ -55,9 +55,10 @@ class ExamPaperTypography {
   static const int minFontSize = 8;
   static const int maxFontSize = 32;
 
-  /// Line spacing as a percentage of the default, so 100 % keeps the official
-  /// layout. Lower values tighten the paper and fit more questions per page.
-  static const int defaultLineSpacingPercent = 100;
+  /// Line spacing as a percentage of the default. The project starts from a
+  /// tightened 55 % so a full paper fits the page; 100 % restores the official
+  /// spacing of the source document.
+  static const int defaultLineSpacingPercent = 55;
   static const int minLineSpacingPercent = 50;
   static const int maxLineSpacingPercent = 200;
 
@@ -345,6 +346,10 @@ class ExamPaper {
   static const String defaultTheoryHeader = 'المادة النظرية / اجب عن سؤالين فقط';
   static const String defaultPracticalHeader = 'المادة العملية : اجب عن سؤالين فقط';
 
+  /// Filler of the printable line under the theory heading, exactly as in the
+  /// requested layout: `____( 30 درجة ) لكل سؤال ( 15 درجة )`.
+  static const String degreeRule = '____________';
+
   static const int minDegree = 0;
   static const int maxDegree = 100;
 
@@ -362,6 +367,46 @@ class ExamPaper {
   final String theoryHeader;
   final String practicalHeader;
 
+  /// The theory heading as printed, on its own line:
+  /// `المادة النظرية / اجب عن سؤالين فقط ____( 30 درجة ) لكل سؤال ( 15 درجة )`.
+  String get theoryHeadingLine {
+    final header = theoryHeader.trim();
+    final buffer = StringBuffer()
+      ..write(header.isEmpty ? defaultTheoryHeader : header)
+      ..write(' $degreeRule( $theoryDegree درجة )');
+    final perQuestion = theoryPerQuestionDegree;
+    if (perQuestion != null) {
+      buffer.write(' لكل سؤال ( $perQuestion درجة )');
+    }
+    return buffer.toString();
+  }
+
+  /// The theory heading exactly as typed by the teacher, without the rule and
+  /// the degrees; the editor edits this part.
+  String get theoryHeadingText => theoryHeader.trim().isEmpty
+      ? defaultTheoryHeader
+      : theoryHeader.trim();
+
+  /// Degree of every theoretical question; null when the total cannot be split
+  /// evenly between the two questions the paper asks for.
+  int? get theoryPerQuestionDegree {
+    if (theoryQuestionCount <= 0) {
+      return null;
+    }
+    final split = theoryDegree ~/ theoryQuestionCount;
+    return theoryDegree % theoryQuestionCount == 0 ? split : null;
+  }
+
+  /// Number of theoretical questions actually written, not the number of items.
+  int get theoryQuestionCount => theory.length;
+
+  /// The practical heading as printed, e.g. `المادة العملية : اجب عن سؤالين فقط ( 70 درجة )`.
+  String get practicalHeadingLine {
+    final header = practicalHeader.trim();
+    final base = header.isEmpty ? defaultPracticalHeader : header;
+    return '$base ( $practicalDegree درجة )';
+  }
+
   List<ExamTheoryItem> get theoryItems => <ExamTheoryItem>[
     for (final ExamTheoryQuestion question in theory) ...question.items,
   ];
@@ -375,6 +420,29 @@ class ExamPaper {
   bool get hasPractical => practical.isNotEmpty;
 
   int get questionCount => theory.where((ExamTheoryQuestion item) => !item.isEmpty).length + practical.length;
+
+  /// A copy with the parts that change while the teacher edits the paper.
+  ExamPaper copyWith({
+    ExamPaperInfo? info,
+    ExamPaperTypography? typography,
+    List<ExamTheoryQuestion>? theory,
+    List<ExamPracticalQuestion>? practical,
+    int? theoryDegree,
+    int? practicalDegree,
+    String? theoryHeader,
+    String? practicalHeader,
+  }) {
+    return ExamPaper(
+      info: info ?? this.info,
+      typography: typography ?? this.typography,
+      theory: theory ?? this.theory,
+      practical: practical ?? this.practical,
+      theoryDegree: theoryDegree ?? this.theoryDegree,
+      practicalDegree: practicalDegree ?? this.practicalDegree,
+      theoryHeader: theoryHeader ?? this.theoryHeader,
+      practicalHeader: practicalHeader ?? this.practicalHeader,
+    );
+  }
 
   static bool isValidDegree(int? degree) =>
       degree != null && degree >= minDegree && degree <= maxDegree;

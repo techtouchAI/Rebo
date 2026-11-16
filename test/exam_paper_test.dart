@@ -213,10 +213,16 @@ void main() {
 
   group('line spacing', () {
     test('keeps the official layout at the default percentage', () {
+      // The project starts from 55 %; 100 % restores the source document.
       const typography = ExamPaperTypography();
+      expect(typography.lineSpacingPercent, 55);
+      expect(typography.lineTwips, 198);
       expect(typography.usesDefaultLineSpacing, isTrue);
-      expect(typography.lineTwips, ExamPaperTypography.baseLineTwips);
-      expect(typography.lineTwips, 360);
+
+      const official = ExamPaperTypography(lineSpacingPercent: 100);
+      expect(official.lineTwips, ExamPaperTypography.baseLineTwips);
+      expect(official.lineTwips, 360);
+      expect(official.usesDefaultLineSpacing, isFalse);
     });
 
     test('tightens and widens the spacing proportionally', () {
@@ -284,6 +290,146 @@ void main() {
     });
   });
 
+  group('printed headings and marks', () {
+    test('prints the requested theory line with 30 and 15 marks', () {
+      final paper = buildSamplePaper(
+        typography: const ExamPaperTypography(lineSpacingPercent: 55),
+      ).copyWith(theoryDegree: 30);
+      expect(
+        paper.theoryHeadingLine,
+        'المادة النظرية / اجب عن سؤالين فقط ____________( 30 درجة ) لكل سؤال ( 15 درجة )',
+      );
+      // Two theoretical questions split the 30 marks evenly.
+      expect(paper.theoryQuestionCount, 3);
+      expect(paper.theoryDegree, 30);
+    });
+
+    test('prints the practical line with its total only', () {
+      final paper = buildSamplePaper().copyWith(practicalDegree: 70);
+      expect(
+        paper.practicalHeadingLine,
+        'المادة العملية : اجب عن سؤالين فقط ( 70 درجة )',
+      );
+    });
+
+    test('omits the per-question marks when the total cannot be split', () {
+      const typography = ExamPaperTypography();
+      final paper = ExamPaper(
+        info: buildSamplePaper().info,
+        typography: typography,
+        theory: buildSamplePaper().theory,
+        practical: buildSamplePaper().practical,
+        theoryDegree: 30,
+        practicalDegree: 70,
+        theoryHeader: 'المادة النظرية / اجب عن سؤالين فقط',
+        practicalHeader: 'المادة العملية : اجب عن سؤالين فقط',
+      );
+      expect(paper.theoryPerQuestionDegree, 10); // 30 / 3 questions
+      final uneven = paper.copyWith(theoryDegree: 31);
+      expect(uneven.theoryPerQuestionDegree, isNull);
+      expect(uneven.theoryHeadingLine, isNot(contains('لكل سؤال')));
+    });
+
+    test('keeps both headings editable and falls back to the official wording', () {
+      final paper = buildSamplePaper().copyWith(
+        theoryHeader: '  ',
+        practicalHeader: 'المادة العملية / ارسم',
+      );
+      expect(paper.theoryHeadingLine, startsWith(ExamPaper.defaultTheoryHeader));
+      expect(paper.practicalHeadingLine, startsWith('المادة العملية / ارسم'));
+    });
+  });
+
+  group('question bank', () {
+    test('round-trips an entry through JSON', () {
+      final entry = ExamQuestionBankEntry(
+        id: 'group-1',
+        title: 'نصف السنة • ٣ أسئلة',
+        savedAt: DateTime(2026, 1, 15, 9, 30),
+        selection: const <String, List<String>>{
+          'trueFalse': <String>['u1:q1', 'u1:q2'],
+          'open': <String>['u2:q8'],
+        },
+        practicalPrompts: const <String>['ارسم منظراً طبيعياً'],
+        theoryDegree: 30,
+        practicalDegree: 70,
+        theoryHeader: 'عنوان مخصص',
+      );
+      final restored = ExamQuestionBankEntry.fromJson(entry.toJson());
+      expect(restored.id, entry.id);
+      expect(restored.savedAt, entry.savedAt);
+      expect(restored.selection['trueFalse'], <String>['u1:q1', 'u1:q2']);
+      expect(restored.practicalPrompts, <String>['ارسم منظراً طبيعياً']);
+      expect(restored.theoryDegree, 30);
+      expect(restored.theoryHeader, 'عنوان مخصص');
+      expect(restored.itemCount, 4);
+      expect(restored.isEmpty, isFalse);
+    });
+
+    test('survives a corrupt or partial document', () {
+      final repaired = ExamQuestionBankEntry.fromJson(<String, dynamic>{
+        'id': 42,
+        'selection': 'not-a-map',
+        'practicalPrompts': <dynamic>[1, 'نص'],
+      });
+      expect(repaired.selection, isEmpty);
+      expect(repaired.practicalPrompts, <String>['نص']);
+      expect(repaired.theoryHeader, ExamPaper.defaultTheoryHeader);
+      expect(repaired.isEmpty, isTrue);
+    });
+
+    test('exported selection becomes a restorable entry', () async {
+      final library = await ensureLibrary();
+      final state = ExamComposerState(
+        units: library.unitsOf('g1'),
+        drawings: library.drawings,
+        gradeLabel: examGradeLabel('الصف الأول المتوسط'),
+        now: DateTime(2025, 10, 1),
+      );
+      final options = state.optionsOf(QuestionKind.trueFalse);
+      state
+        ..toggleItem(QuestionKind.trueFalse, options.first.id)
+        ..setPracticalPrompt(0, 'ارسم موضوعاً');
+      final entry = state.toBankEntry(id: 'g', title: 't', savedAt: DateTime(2026));
+
+      expect(entry.selection['trueFalse'], <String>[options.first.id]);
+      expect(entry.practicalPrompts, <String>['ارسم موضوعاً']);
+      expect(entry.theoryDegree, 30);
+      expect(entry.practicalDegree, 70);
+
+      // The stored entry restores the same selection.
+      final other = ExamComposerState(
+        units: library.unitsOf('g1'),
+        drawings: library.drawings,
+        gradeLabel: examGradeLabel('الصف الأول المتوسط'),
+        now: DateTime(2025, 10, 1),
+      )..applyBankEntry(entry);
+      expect(other.isSelected(QuestionKind.trueFalse, options.first.id), isTrue);
+      expect(other.practical.first.prompt, 'ارسم موضوعاً');
+      expect(other.theoryDegree, 30);
+    });
+
+    test('ignores ids that no longer exist in the curriculum', () async {
+      final library = await ensureLibrary();
+      final state = ExamComposerState(
+        units: library.unitsOf('g1'),
+        drawings: library.drawings,
+        gradeLabel: examGradeLabel('الصف الأول المتوسط'),
+      )..applyBankEntry(
+          ExamQuestionBankEntry(
+            id: 'old',
+            title: 'قديمة',
+            savedAt: DateTime(2026),
+            selection: const <String, List<String>>{
+              'trueFalse': <String>['gone:q1'],
+            },
+          ),
+        );
+      expect(state.selectionOf(QuestionKind.trueFalse), isEmpty);
+      expect(state.theoryItemCount, 0);
+    });
+  });
+
   group('composer state', () {
     late Library library;
     late ExamComposerState state;
@@ -303,9 +449,12 @@ void main() {
       expect(state.academicYear, '2025 – 2026');
       expect(state.term, ExamTerm.midYear);
       expect(state.typography!.headerFontSize, 12);
-      expect(state.degreeOf(QuestionKind.trueFalse), 6);
-      expect(state.degreeOf(QuestionKind.choice), 4);
+      // Every theoretical question carries 15 marks: 30 marks for the two
+      // questions the paper asks for.
+      expect(state.degreeOf(QuestionKind.trueFalse), 15);
+      expect(state.degreeOf(QuestionKind.choice), 15);
       expect(state.degreeOf(QuestionKind.open), 15);
+      expect(state.theoryDegree, 30);
       expect(state.theoryItemCount, 0);
       expect(state.paper, isNull);
       expect(state.issues, contains(ExamPaperInfo.missingSchool));

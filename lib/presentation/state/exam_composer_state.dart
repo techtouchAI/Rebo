@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../domain/models/exam_paper.dart';
+import '../../domain/models/exam_question_bank.dart';
 import '../../domain/models/library.dart';
 import '../../domain/repositories/exam_profile_repository.dart';
 import '../../domain/services/exam_paper_formatter.dart';
@@ -38,9 +39,9 @@ class ExamComposerState extends ChangeNotifier {
       _answerLines[kind] = ExamTheoryQuestion.defaultAnswerLineCount;
       _customizedInstructions[kind] = false;
     }
-    _degrees[QuestionKind.trueFalse] = 6;
-    _degrees[QuestionKind.choice] = 4;
-    _degrees[QuestionKind.open] = 15;
+    _degrees[QuestionKind.trueFalse] = defaultTheoryQuestionDegree;
+    _degrees[QuestionKind.choice] = defaultTheoryQuestionDegree;
+    _degrees[QuestionKind.open] = defaultTheoryQuestionDegree;
     practical = <ExamPracticalQuestion>[
       for (var i = 0; i < practicalSlotCount; i++)
         const ExamPracticalQuestion(prompt: '', degree: defaultPracticalDegree),
@@ -49,7 +50,11 @@ class ExamComposerState extends ChangeNotifier {
 
   static const int practicalSlotCount = 3;
   static const int defaultPracticalDegree = 35;
-  static const int defaultTheoryDegree = 10;
+  /// The requested layout: 30 marks for the theory split into two questions of
+  /// 15 marks each, and 70 marks for the practical section.
+  static const int defaultTheoryDegree = 30;
+  static const int defaultTheoryQuestionDegree = 15;
+  static const int defaultTheoryQuestionCount = 2;
   static const int defaultPracticalTotal = 70;
 
   /// Questions documented in the curriculum, in source order.
@@ -201,6 +206,11 @@ class ExamComposerState extends ChangeNotifier {
   int? theoryDegree = defaultTheoryDegree;
   int? practicalDegree = defaultPracticalTotal;
 
+  /// Editable captions; they keep the official wording until the teacher
+  /// changes them.
+  String theoryHeader = ExamPaper.defaultTheoryHeader;
+  String practicalHeader = ExamPaper.defaultPracticalHeader;
+
   List<ExamQuestionOption> optionsOf(QuestionKind kind) => <ExamQuestionOption>[
     for (final ExamQuestionOption option in options)
       if (option.question.kind == kind) option,
@@ -259,6 +269,29 @@ class ExamComposerState extends ChangeNotifier {
 
   void setPracticalDegree(int? degree) {
     practicalDegree = degree;
+    notifyListeners();
+  }
+
+  void setTheoryHeader(String value) {
+    if (theoryHeader == value) {
+      return;
+    }
+    theoryHeader = value;
+    notifyListeners();
+  }
+
+  void setPracticalHeader(String value) {
+    if (practicalHeader == value) {
+      return;
+    }
+    practicalHeader = value;
+    notifyListeners();
+  }
+
+  /// Restores both captions to the official wording.
+  void resetHeaders() {
+    theoryHeader = ExamPaper.defaultTheoryHeader;
+    practicalHeader = ExamPaper.defaultPracticalHeader;
     notifyListeners();
   }
 
@@ -359,6 +392,8 @@ class ExamComposerState extends ChangeNotifier {
       ],
       theoryDegree: theoryDegree ?? -1,
       practicalDegree: practicalDegree ?? -1,
+      theoryHeader: theoryHeader,
+      practicalHeader: practicalHeader,
     );
   }
 
@@ -388,6 +423,67 @@ class ExamComposerState extends ChangeNotifier {
       return const <String>[ExamPaper.invalidFontSizes];
     }
     return buildPaperWith(current).issues;
+  }
+
+  // ----------------------------------------------------------- question bank ---
+
+  /// The current selection as a bank entry, ready to be stored.
+  ///
+  /// Empty kinds are left out so the stored group stays compact; the ids are
+  /// the unique option ids (`unit:question`) produced by the formatter.
+  ExamQuestionBankEntry toBankEntry({
+    required String id,
+    required String title,
+    DateTime? savedAt,
+  }) {
+    return ExamQuestionBankEntry(
+      id: id,
+      title: title,
+      savedAt: savedAt ?? DateTime.now(),
+      selection: <String, List<String>>{
+        for (final QuestionKind kind in ExamTheoryQuestion.kinds)
+          if (selectionOf(kind).isNotEmpty) kind.name: selectionOf(kind).toList(growable: false),
+      },
+      practicalPrompts: <String>[
+        for (final ExamPracticalQuestion question in practical)
+          if (!question.isEmpty) question.prompt.trim(),
+      ],
+      theoryDegree: theoryDegree ?? ExamQuestionBankEntry.defaultTheoryDegree,
+      practicalDegree: practicalDegree ?? ExamQuestionBankEntry.defaultPracticalDegree,
+      theoryHeader: theoryHeader,
+      practicalHeader: practicalHeader,
+    );
+  }
+
+  /// Restores a stored group; ids that no longer exist in the curriculum are
+  /// ignored instead of breaking the paper.
+  void applyBankEntry(ExamQuestionBankEntry entry) {
+    final known = <String>{
+      for (final ExamQuestionOption option in options) option.id,
+    };
+    for (final QuestionKind kind in ExamTheoryQuestion.kinds) {
+      _selected[kind] = <String>{
+        for (final String id in entry.selection[kind.name] ?? const <String>[])
+          if (known.contains(id)) id,
+      };
+      if (!isInstructionCustomized(kind)) {
+        _instructions[kind] = defaultTheoryInstruction(kind, _selected[kind]!.length);
+      }
+    }
+    for (var i = 0; i < practical.length; i++) {
+      final prompt = i < entry.practicalPrompts.length ? entry.practicalPrompts[i] : '';
+      practical[i] = ExamPracticalQuestion(
+        prompt: prompt,
+        degree: practical[i].degree,
+        drawingId: practical[i].drawingId,
+        drawingTitle: practical[i].drawingTitle,
+      );
+    }
+    theoryDegree = entry.theoryDegree;
+    practicalDegree = entry.practicalDegree;
+    theoryHeader = entry.theoryHeader;
+    practicalHeader = entry.practicalHeader;
+    notifyListeners();
   }
 
   /// The profile saved after a successful export.

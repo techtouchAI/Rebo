@@ -81,6 +81,15 @@ void main() {
     expect(AppFont.values.length, greaterThanOrEqualTo(4));
   });
 
+  test('the application text size starts at 80 per cent', () {
+    expect(defaultTextScale, 0.8);
+    expect(ReadingProgress().textScale, defaultTextScale);
+    // A document saved before the default changed keeps its own value.
+    final legacy = ReadingProgress.fromJson(<String, dynamic>{});
+    expect(legacy.textScale, defaultTextScale);
+    expect(ReadingProgress.fromJson(<String, dynamic>{'textScale': 1.1}).textScale, 1.1);
+  });
+
   test('text scale is clamped and theme mode is persisted', () async {
     final repository = MemoryProgressRepository();
     final state = buildState(library: library, repository: repository);

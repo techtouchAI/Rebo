@@ -383,9 +383,7 @@ class _DocumentWriter {
     final bodySize = typography.bodyHalfPoints;
     _buffer.write(
       _paragraphXml(<_Run>[
-        _Run('${paper.theoryHeader} ', size: headingSize, bold: true),
-        _Run('___________', size: headingSize, bold: true),
-        _Run(' ( ${paper.theoryDegree} درجة )', size: headingSize, bold: true),
+        _Run(paper.theoryHeadingLine, size: headingSize, bold: true),
       ], keepNext: true),
     );
 
@@ -426,7 +424,7 @@ class _DocumentWriter {
     final bodySize = typography.bodyHalfPoints;
     _buffer.write(
       _paragraphXml(<_Run>[
-        _Run('${paper.practicalHeader} ( ${paper.practicalDegree} درجة )', size: headingSize, bold: true),
+        _Run(paper.practicalHeadingLine, size: headingSize, bold: true),
       ], keepNext: true),
     );
     for (var i = 0; i < paper.practical.length; i++) {

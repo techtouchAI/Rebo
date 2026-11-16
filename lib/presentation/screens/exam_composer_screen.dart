@@ -8,6 +8,9 @@ import '../../core/widgets/app_page.dart';
 import '../../data/local/docx/exam_docx_builder.dart';
 import '../../data/local/exam_document_exporter.dart';
 import '../../data/local/prefs_exam_profile_repository.dart';
+import '../../data/local/prefs_exam_question_bank_repository.dart';
+import '../../domain/models/exam_question_bank.dart';
+import '../../domain/repositories/exam_question_bank_repository.dart';
 import '../../domain/models/exam_paper.dart';
 import '../../domain/repositories/exam_profile_repository.dart';
 import '../../domain/services/exam_paper_formatter.dart';
@@ -36,10 +39,16 @@ const List<String> examStepTitles = <String>[
 /// Both the file writer and the profile store are injectable so that the widget
 /// tests never touch the platform channels.
 class ExamComposerScreen extends StatefulWidget {
-  const ExamComposerScreen({super.key, this.exportDocument, this.profileRepository});
+  const ExamComposerScreen({
+    super.key,
+    this.exportDocument,
+    this.profileRepository,
+    this.questionBankRepository,
+  });
 
   final ExamDocumentExport? exportDocument;
   final ExamProfileRepository? profileRepository;
+  final ExamQuestionBankRepository? questionBankRepository;
 
   @override
   State<ExamComposerScreen> createState() => _ExamComposerScreenState();
@@ -53,10 +62,14 @@ class _ExamComposerScreenState extends State<ExamComposerScreen> {
   int _theoryIndex = 0;
   bool _exporting = false;
 
+  late final ExamQuestionBankRepository _bank;
+  List<ExamQuestionBankEntry> _savedGroups = const <ExamQuestionBankEntry>[];
+
   @override
   void initState() {
     super.initState();
     _profiles = widget.profileRepository ?? const PrefsExamProfileRepository();
+    _bank = widget.questionBankRepository ?? const PrefsExamQuestionBankRepository();
     _bootstrap();
   }
 
@@ -77,6 +90,10 @@ class _ExamComposerScreenState extends State<ExamComposerScreen> {
     if (!mounted) {
       return;
     }
+    _savedGroups = await _loadBank();
+    if (!mounted) {
+      return;
+    }
     final app = AppScope.read(context);
     final composer = ExamComposerState(
       units: app.visibleUnits,
@@ -89,6 +106,86 @@ class _ExamComposerScreenState extends State<ExamComposerScreen> {
       _composer = composer;
       _controllers = controllers;
     });
+  }
+
+  Future<List<ExamQuestionBankEntry>> _loadBank() async {
+    try {
+      return await _bank.load();
+    } catch (error, stackTrace) {
+      debugPrint('Exam question bank loading failed: $error\n$stackTrace');
+      return const <ExamQuestionBankEntry>[];
+    }
+  }
+
+  /// Keeps the current selection in the on-device bank.
+  Future<void> _saveGroup() async {
+    final composer = _composer;
+    if (composer == null || _exporting) {
+      return;
+    }
+    final entry = composer.toBankEntry(
+      id: 'group-${DateTime.now().microsecondsSinceEpoch}',
+      title: _groupTitle(composer),
+    );
+    if (entry.isEmpty) {
+      _showMessage('اختر سؤالاً واحداً على الأقل قبل الحفظ.');
+      return;
+    }
+    final next = <ExamQuestionBankEntry>[entry, ..._savedGroups];
+    try {
+      await _bank.save(next);
+    } catch (error, stackTrace) {
+      debugPrint('Saving the exam question group failed: $error\n$stackTrace');
+      _showMessage('تعذّر حفظ المجموعة. حاول مرة أخرى.');
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() => _savedGroups = next);
+    _showMessage('حُفظت المجموعة في التطبيق للرجوع إليها لاحقاً.');
+  }
+
+  String _groupTitle(ExamComposerState composer) {
+    final grade = composer.gradeLabel.trim();
+    final term = composer.term.label;
+    final count = toArabicDigits('${composer.theoryItemCount + composer.practicalCount}');
+    return '$term • $count سؤالاً${grade.isEmpty ? '' : ' • $grade'}';
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Lists the saved groups so one of them can be restored.
+  Future<void> _openBank() async {
+    if (_exporting) {
+      return;
+    }
+    final entries = _savedGroups.isEmpty ? await _loadBank() : _savedGroups;
+    if (!mounted) {
+      return;
+    }
+    if (entries.isEmpty) {
+      _showMessage('لا توجد مجموعات محفوظة بعد.');
+      return;
+    }
+    setState(() => _savedGroups = entries);
+    final chosen = await showDialog<ExamQuestionBankEntry>(
+      context: context,
+      builder: (BuildContext context) => _BankDialog(entries: entries),
+    );
+    final composer = _composer;
+    final controllers = _controllers;
+    if (chosen == null || !mounted || composer == null || controllers == null) {
+      return;
+    }
+    composer.applyBankEntry(chosen);
+    controllers.syncFrom(composer);
+    _showMessage('استُرجعت المجموعة المحفوظة.');
   }
 
   Future<void> _export() async {
@@ -183,10 +280,36 @@ class _ExamComposerScreenState extends State<ExamComposerScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               const SizedBox(height: AppSpacing.md),
+              _bankBar(),
+              const SizedBox(height: AppSpacing.md),
               _StepBar(step: _step, onSelected: _goTo),
               const SizedBox(height: AppSpacing.lg),
               panels[_step],
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Saving and restoring the group, available from every step.
+  Widget _bankBar() {
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
+      children: <Widget>[
+        OutlinedButton.icon(
+          key: const ValueKey<String>('exam-save-group'),
+          onPressed: _exporting ? null : _saveGroup,
+          icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+          label: const Text('حفظ المجموعة'),
+        ),
+        OutlinedButton.icon(
+          key: const ValueKey<String>('exam-open-bank'),
+          onPressed: _exporting ? null : _openBank,
+          icon: const Icon(Icons.inventory_2_outlined, size: 18),
+          label: Text(
+            'المجموعات المحفوظة (${toArabicDigits('${_savedGroups.length}')})',
           ),
         ),
       ],
@@ -314,6 +437,51 @@ class _StepBar extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Lists the saved groups and returns the one the teacher picks.
+class _BankDialog extends StatelessWidget {
+  const _BankDialog({required this.entries});
+
+  final List<ExamQuestionBankEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: const Text('المجموعات المحفوظة'),
+      content: SizedBox(
+        width: 420,
+        height: 360,
+        child: ListView.separated(
+          itemCount: entries.length,
+          separatorBuilder: (BuildContext context, int index) => const Divider(height: 1),
+          itemBuilder: (BuildContext context, int index) {
+            final entry = entries[index];
+            return ListTile(
+              key: ValueKey<String>('exam-bank-entry-${entry.id}'),
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.folder_open_outlined),
+              title: Text(entry.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+              subtitle: Text(
+                '${toArabicDigits('${entry.itemCount}')} عنصراً • '
+                '${entry.savedAt.year}/${entry.savedAt.month}/${entry.savedAt.day}',
+                style: theme.textTheme.bodySmall,
+              ),
+              onTap: () => Navigator.of(context).pop(entry),
+            );
+          },
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          key: const ValueKey<String>('exam-bank-close'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إغلاق'),
+        ),
+      ],
     );
   }
 }

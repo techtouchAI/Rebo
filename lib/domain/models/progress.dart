@@ -46,6 +46,9 @@ enum AppFont {
   }
 }
 
+/// The application text size starts at 80 %, as requested for the project.
+const double defaultTextScale = 0.8;
+
 class ReadingProgress {
   ReadingProgress({
     Set<String>? favorites,
@@ -54,7 +57,7 @@ class ReadingProgress {
     Map<String, double>? scrollOffsets,
     Map<String, int>? quizScores,
     this.themeMode = AppThemeMode.system,
-    this.textScale = 1.0,
+    this.textScale = defaultTextScale,
     this.gradeId,
     this.font = AppFont.almarai,
   })  : favorites = favorites ?? <String>{},
@@ -117,7 +120,7 @@ class ReadingProgress {
       scrollOffsets: _doubleMap(json['scrollOffsets']),
       quizScores: _intMap(json['quizScores']),
       themeMode: AppThemeMode.parse(json['themeMode'] as String?),
-      textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
+      textScale: (json['textScale'] as num?)?.toDouble() ?? defaultTextScale,
       gradeId: json['gradeId'] as String?,
       font: AppFont.parse(json['font'] as String?),
     );

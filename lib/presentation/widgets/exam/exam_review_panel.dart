@@ -125,8 +125,12 @@ class ExamReviewPanel extends StatelessWidget {
   String _degreesLabel() {
     final theory = state.theoryDegree;
     final practical = state.practicalDegree;
+    final paper = this.paper;
+    final perQuestion = paper?.theoryPerQuestionDegree;
     final parts = <String>[
-      if (theory != null) 'النظري ${toArabicDigits('$theory')}',
+      if (theory != null)
+        'النظري ${toArabicDigits('$theory')}'
+            '${perQuestion == null ? '' : ' (${toArabicDigits('$perQuestion')} لكل سؤال)'}',
       if (practical != null) 'العملي ${toArabicDigits('$practical')}',
     ];
     return parts.isEmpty ? '—' : parts.join(' • ');

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mirsam/data/local/exam_document_exporter.dart';
 import 'package:mirsam/data/local/memory_exam_profile_repository.dart';
+import 'package:mirsam/data/local/memory_exam_question_bank_repository.dart';
+import 'package:mirsam/domain/models/exam_question_bank.dart';
 import 'package:mirsam/domain/models/exam_paper.dart';
 import 'package:mirsam/domain/models/library.dart';
 import 'package:mirsam/domain/repositories/exam_profile_repository.dart';
@@ -30,6 +32,7 @@ Future<AppState> pumpComposer(
   WidgetTester tester, {
   ExamDocumentExport? exporter,
   ExamProfileRepository? repository,
+  MemoryExamQuestionBankRepository? bank,
   Size size = const Size(900, 1600),
 }) async {
   final state = await pumpScreen(
@@ -37,6 +40,7 @@ Future<AppState> pumpComposer(
     ExamComposerScreen(
       exportDocument: exporter,
       profileRepository: repository ?? MemoryExamProfileRepository(),
+      questionBankRepository: bank ?? MemoryExamQuestionBankRepository(),
     ),
     size: size,
   );
@@ -127,7 +131,7 @@ void main() {
     expect(fieldText(tester, 'exam-header-size'), '12');
     expect(fieldText(tester, 'exam-body-size'), '14');
     expect(fieldText(tester, 'exam-heading-size'), '16');
-    expect(fieldText(tester, 'exam-line-spacing'), '100');
+    expect(fieldText(tester, 'exam-line-spacing'), '55');
 
     await tapKey(tester, 'exam-next');
     expect(fieldText(tester, 'exam-school'), isEmpty);
@@ -195,9 +199,9 @@ void main() {
       },
     );
 
-    // The sample profile is the official one until the teacher changes it.
+    // The project starts from a tightened 55 %; restoring means 100 %.
     expect(key('exam-spacing-label'), findsOneWidget);
-    expect(tester.widget<Slider>(key('exam-line-spacing-slider')).value, 100);
+    expect(tester.widget<Slider>(key('exam-line-spacing-slider')).value, 55);
     // Restoring is pointless while the value is already the default.
     expect(
       tester.widget<TextButton>(key('exam-line-spacing-reset')).onPressed,
@@ -352,6 +356,95 @@ void main() {
     final xml = documentXmlOf(exports.single.bytes);
     expect(xml, contains('المادة النظرية'));
     expect(xml, contains('المادة العملية'));
+  });
+
+  testWidgets('saves the group in the app and restores it', (tester) async {
+    final bank = MemoryExamQuestionBankRepository();
+    final state = await pumpComposer(tester, bank: bank);
+    final questions = firstQuestions(state);
+
+    // Nothing saved yet.
+    await tapKey(tester, 'exam-open-bank');
+    expect(find.text('لا توجد مجموعات محفوظة بعد.'), findsOneWidget);
+    expect(bank.saveCount, 0);
+
+    await tapKey(tester, 'exam-next');
+    await tapKey(tester, 'exam-next');
+    await tapKey(tester, 'exam-item-${questions.trueFalse.id}');
+    await tapKey(tester, 'exam-save-group');
+    await tester.pumpAndSettle();
+
+    expect(bank.saveCount, 1);
+    expect(bank.entries, hasLength(1));
+    expect(
+      bank.entries.single.selection['trueFalse'],
+      contains(questions.trueFalse.id),
+    );
+    expect(find.textContaining('حُفظت المجموعة'), findsOneWidget);
+
+    // A second start from the stored bank restores that selection; pumping a
+    // new screen replaces the previous tree entirely.
+    final reopening = MemoryExamQuestionBankRepository(bank.entries);
+    await pumpComposer(tester, bank: reopening);
+    await tapKey(tester, 'exam-open-bank');
+    await tester.pumpAndSettle();
+    expect(find.text('المجموعات المحفوظة'), findsOneWidget);
+    await tester.tap(find.byKey(ValueKey<String>('exam-bank-entry-${bank.entries.single.id}')));
+    await tester.pumpAndSettle();
+
+    await tapKey(tester, 'exam-next');
+    await tapKey(tester, 'exam-next');
+    expect(
+      tester.widget<CheckboxListTile>(key('exam-item-${questions.trueFalse.id}')).value,
+      isTrue,
+    );
+  });
+
+  testWidgets('the two section headings are editable and reach the file',
+      (tester) async {
+    final exports = <({Uint8List bytes, String name})>[];
+    final state = await pumpComposer(
+      tester,
+      exporter: (Uint8List bytes, String name) async {
+        exports.add((bytes: bytes, name: name));
+        return ExamExportResult(message: 'تم تجهيز الملف', path: '/tmp/$name', shared: true);
+      },
+    );
+
+    await tapKey(tester, 'exam-next'); // Header step.
+    await tester.enterText(key('exam-school'), 'متوسطة النخبة للبنين');
+    await tester.enterText(key('exam-teacher'), 'فائز محمد عبد النبي');
+    await tester.pump();
+    await tapKey(tester, 'exam-next'); // Theory step.
+    expect(key('exam-theory-header'), findsOneWidget);
+    await tester.enterText(key('exam-theory-header'), 'المادة النظرية / اجب عن سؤالين فقط');
+    await tester.pump();
+
+    final questions = firstQuestions(state);
+    await tapKey(tester, 'exam-item-${questions.trueFalse.id}');
+    await tapKey(tester, 'exam-theory-next');
+    await tapKey(tester, 'exam-theory-next');
+    await tapKey(tester, 'exam-next'); // Practical step.
+    expect(key('exam-practical-header'), findsOneWidget);
+    await tester.enterText(key('exam-practical-header'), 'المادة العملية : اجب عن سؤالين فقط');
+    await tester.pump();
+    await chooseDrawing(tester, 0, state.visibleDrawings.first);
+    await tapKey(tester, 'exam-next'); // Review step.
+    await tapKey(tester, 'exam-export');
+    await tester.pumpAndSettle();
+
+    expect(exports, hasLength(1));
+    final xml = documentXmlOf(exports.single.bytes);
+    expect(xml, contains('المادة النظرية / اجب عن سؤالين فقط'));
+    expect(xml, contains('( 30 درجة )'));
+    expect(xml, contains('لكل سؤال ( 15 درجة )'));
+    expect(xml, contains('المادة العملية : اجب عن سؤالين فقط ( 70 درجة )'));
+    expectWellFormedXml(xml);
+
+    // The preview shows exactly the same headings as the file.
+    final preview = tester.widget<SelectableText>(key('exam-preview')).data!;
+    expect(preview, contains('( 30 درجة ) لكل سؤال ( 15 درجة )'));
+    expect(preview, contains('( 70 درجة )'));
   });
 
   for (final double width in <double>[320, 360, 390]) {

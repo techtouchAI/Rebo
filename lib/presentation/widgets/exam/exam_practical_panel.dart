@@ -38,6 +38,18 @@ class ExamPracticalPanel extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
+              TextField(
+                key: const ValueKey<String>('exam-practical-header'),
+                controller: controllers.practicalHeader,
+                maxLines: null,
+                decoration: const InputDecoration(
+                  labelText: 'عنوان المادة العملية',
+                  helperText: 'تُطبع بعده الدرجة الكلية تلقائياً.',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: state.setPracticalHeader,
+              ),
+              const SizedBox(height: AppSpacing.md),
               ExamNumberField(
                 fieldKey: const ValueKey<String>('exam-practical-total'),
                 label: 'درجة القسم العملي',

@@ -158,8 +158,12 @@ void main() {
       expect(styles, contains('w:cs="Amiri"'));
     });
 
-    test('keeps the official line spacing by default', () {
-      final bytes = ExamDocxBuilder.build(buildSamplePaper());
+    test('keeps the official line spacing when asked for it', () {
+      final bytes = ExamDocxBuilder.build(
+        buildSamplePaper(
+          typography: const ExamPaperTypography(lineSpacingPercent: 100),
+        ),
+      );
       final document = documentXmlOf(bytes);
       expect(document, contains('w:line="360" w:lineRule="auto"'));
       final styles = utf8.decode(readStoredZip(bytes)['word/styles.xml']!);

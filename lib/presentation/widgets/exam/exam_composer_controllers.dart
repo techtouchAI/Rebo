@@ -23,6 +23,8 @@ class ExamComposerControllers {
         ),
         theoryDegree = TextEditingController(text: '${state.theoryDegree ?? ''}'),
         practicalDegree = TextEditingController(text: '${state.practicalDegree ?? ''}'),
+        theoryHeader = TextEditingController(text: state.theoryHeader),
+        practicalHeader = TextEditingController(text: state.practicalHeader),
         answerLines = TextEditingController(
           text: '${state.answerLineCountOf(QuestionKind.open)}',
         ),
@@ -51,6 +53,8 @@ class ExamComposerControllers {
   final TextEditingController lineSpacing;
   final TextEditingController theoryDegree;
   final TextEditingController practicalDegree;
+  final TextEditingController theoryHeader;
+  final TextEditingController practicalHeader;
   final TextEditingController answerLines;
   final List<TextEditingController> practicalPrompts;
   final List<TextEditingController> practicalDegrees;
@@ -58,6 +62,33 @@ class ExamComposerControllers {
       <QuestionKind, TextEditingController>{};
   final Map<QuestionKind, TextEditingController> degrees =
       <QuestionKind, TextEditingController>{};
+
+  /// Pushes the values of [state] back into the fields, after a saved group or
+  /// a profile replaced them.
+  void syncFrom(ExamComposerState state) {
+    school.text = state.schoolName;
+    grade.text = state.gradeLabel;
+    section.text = state.sectionName;
+    year.text = state.academicYear;
+    teacher.text = state.teacherName;
+    headerSize.text = '${state.headerFontSize ?? ''}';
+    bodySize.text = '${state.bodyFontSize ?? ''}';
+    headingSize.text = '${state.headingFontSize ?? ''}';
+    lineSpacing.text = '${state.lineSpacingPercent ?? ''}';
+    theoryDegree.text = '${state.theoryDegree ?? ''}';
+    practicalDegree.text = '${state.practicalDegree ?? ''}';
+    theoryHeader.text = state.theoryHeader;
+    practicalHeader.text = state.practicalHeader;
+    answerLines.text = '${state.answerLineCountOf(QuestionKind.open)}';
+    for (final QuestionKind kind in ExamTheoryQuestion.kinds) {
+      instructions[kind]?.text = state.instructionOf(kind);
+      degrees[kind]?.text = '${state.degreeOf(kind) ?? ''}';
+    }
+    for (var i = 0; i < practicalPrompts.length; i++) {
+      practicalPrompts[i].text = state.practical[i].prompt;
+      practicalDegrees[i].text = '${state.practical[i].degree}';
+    }
+  }
 
   void dispose() {
     school.dispose();
@@ -71,6 +102,8 @@ class ExamComposerControllers {
     lineSpacing.dispose();
     theoryDegree.dispose();
     practicalDegree.dispose();
+    theoryHeader.dispose();
+    practicalHeader.dispose();
     answerLines.dispose();
     for (final TextEditingController controller in practicalPrompts) {
       controller.dispose();

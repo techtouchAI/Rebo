@@ -119,7 +119,7 @@ String examPaperAsPlainText(ExamPaper paper) {
     ..writeln(info.classLine)
     ..writeln('الرقم الامتحاني :')
     ..writeln()
-    ..writeln('${paper.theoryHeader} ( ${paper.theoryDegree} درجة )');
+    ..writeln(paper.theoryHeadingLine);
 
   var theoryIndex = 0;
   for (final ExamTheoryQuestion question in paper.theory) {
@@ -141,7 +141,7 @@ String examPaperAsPlainText(ExamPaper paper) {
     buffer.writeln();
   }
 
-  buffer.writeln('${paper.practicalHeader} ( ${paper.practicalDegree} درجة )');
+  buffer.writeln(paper.practicalHeadingLine);
   for (var i = 0; i < paper.practical.length; i++) {
     final ExamPracticalQuestion question = paper.practical[i];
     buffer.writeln('${examQuestionNumber(i)}: ${question.prompt.trim()}   ( ${question.degree} درجة )');

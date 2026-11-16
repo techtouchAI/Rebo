@@ -39,6 +39,10 @@ class ExamTheoryPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        if (index == 0) ...<Widget>[
+          _theoryHeadingCard(context),
+          const SizedBox(height: AppSpacing.lg),
+        ],
         _questionBar(context),
         const SizedBox(height: AppSpacing.lg),
         ExamPanelCard(
@@ -170,6 +174,27 @@ class ExamTheoryPanel extends StatelessWidget {
       return '${option.unitTitle} • ${question.options.join(' / ')}';
     }
     return option.unitTitle;
+  }
+
+  /// The printable heading of the theoretical section; the teacher can edit
+  /// its wording, the degrees stay next to it.
+  Widget _theoryHeadingCard(BuildContext context) {
+    return ExamPanelCard(
+      title: 'عنوان المادة النظرية',
+      subtitle:
+          'يُطبع: نصك، ثم ____________ والدرجات. إجمالي النظري '
+          '${toArabicDigits('${state.theoryDegree ?? 0}')} درجة.',
+      child: TextField(
+        key: const ValueKey<String>('exam-theory-header'),
+        controller: controllers.theoryHeader,
+        maxLines: null,
+        decoration: const InputDecoration(
+          labelText: 'نص العنوان',
+          border: OutlineInputBorder(),
+        ),
+        onChanged: state.setTheoryHeader,
+      ),
+    );
   }
 
   Widget _questionBar(BuildContext context) {
