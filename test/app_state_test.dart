@@ -81,6 +81,33 @@ void main() {
     expect(AppFont.values.length, greaterThanOrEqualTo(4));
   });
 
+  test('the application text size starts at 80 per cent', () {
+    expect(defaultTextScale, 0.8);
+    expect(ReadingProgress().textScale, defaultTextScale);
+    expect(ReadingProgress.fromJson(<String, dynamic>{}).textScale, defaultTextScale);
+  });
+
+  test('a document written before the new default is migrated once', () {
+    // Every build shipped so far started at 100 % and wrote no version, so the
+    // saved 1.0 is the old default, not a choice: it must become 80 %.
+    final legacy = ReadingProgress.fromJson(<String, dynamic>{
+      'textScale': 1.0,
+      'themeMode': 'dark',
+      'gradeId': 'g3',
+    });
+    expect(legacy.textScale, defaultTextScale);
+    // The rest of the document is preserved by the migration.
+    expect(legacy.themeMode, AppThemeMode.dark);
+    expect(legacy.gradeId, 'g3');
+
+    // Once saved again the document carries the version, and a size the user
+    // picks afterwards survives every restart.
+    final chosen = legacy.copy()..textScale = 1.1;
+    final restored = ReadingProgress.fromJson(chosen.toJson());
+    expect(restored.textScale, 1.1);
+    expect(chosen.toJson()['version'], readingProgressVersion);
+  });
+
   test('text scale is clamped and theme mode is persisted', () async {
     final repository = MemoryProgressRepository();
     final state = buildState(library: library, repository: repository);

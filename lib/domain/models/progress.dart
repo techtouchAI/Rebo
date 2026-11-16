@@ -46,6 +46,15 @@ enum AppFont {
   }
 }
 
+/// The application text size starts at 80 %, as requested for the project.
+const double defaultTextScale = 0.8;
+
+/// Documents saved before the default became 80 % carry no settings version and
+/// keep whatever size they were saved with, which is always 100 % for a fresh
+/// install. Bumping this marker makes the new default apply once; a size the
+/// teacher picks afterwards is stored with the marker and is never overridden.
+const int readingProgressVersion = 2;
+
 class ReadingProgress {
   ReadingProgress({
     Set<String>? favorites,
@@ -54,7 +63,7 @@ class ReadingProgress {
     Map<String, double>? scrollOffsets,
     Map<String, int>? quizScores,
     this.themeMode = AppThemeMode.system,
-    this.textScale = 1.0,
+    this.textScale = defaultTextScale,
     this.gradeId,
     this.font = AppFont.almarai,
   })  : favorites = favorites ?? <String>{},
@@ -97,6 +106,7 @@ class ReadingProgress {
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
+      'version': readingProgressVersion,
       'favorites': favorites.toList(),
       'readUnits': readUnits.toList(),
       'lastUnitId': lastUnitId,
@@ -110,6 +120,8 @@ class ReadingProgress {
   }
 
   static ReadingProgress fromJson(Map<String, dynamic> json) {
+    final savedScale = (json['textScale'] as num?)?.toDouble() ?? defaultTextScale;
+    final version = (json['version'] as num?)?.toInt() ?? 0;
     return ReadingProgress(
       favorites: _stringSet(json['favorites']),
       readUnits: _stringSet(json['readUnits']),
@@ -117,7 +129,9 @@ class ReadingProgress {
       scrollOffsets: _doubleMap(json['scrollOffsets']),
       quizScores: _intMap(json['quizScores']),
       themeMode: AppThemeMode.parse(json['themeMode'] as String?),
-      textScale: (json['textScale'] as num?)?.toDouble() ?? 1.0,
+      // An unversioned document was written when the application started at
+      // 100 %, so it is migrated to the new starting size exactly once.
+      textScale: version >= readingProgressVersion ? savedScale : defaultTextScale,
       gradeId: json['gradeId'] as String?,
       font: AppFont.parse(json['font'] as String?),
     );
